@@ -7,9 +7,15 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
   type CallToolResult,
+  type Implementation,
   type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { PluginRegistry } from "@micromatrix/plugin-kit";
+import { ExternalMcpError, type PluginRegistry } from "@micromatrix/plugin-kit";
+
+export const DEFAULT_SERVER_INFO: Implementation = {
+  name: "micromatrix-pi-body",
+  version: "0.1.0",
+};
 
 export function toMcpTool(tool: AgentTool): Tool {
   return {
@@ -21,6 +27,10 @@ export function toMcpTool(tool: AgentTool): Tool {
 }
 
 export function toMcpResult(result: AgentToolResult): CallToolResult {
+  const details = result.details;
+  if (details && typeof details === "object" && "externalMcpResult" in details) {
+    return details.externalMcpResult as CallToolResult;
+  }
   return {
     content: result.content.map((part) =>
       part.type === "text"
@@ -34,12 +44,15 @@ export function createProtocolServer(
   registry: PluginRegistry,
   gate?: ToolExecutionGate,
   executionContext?: ToolExecutionContext,
+  serverInfo: Implementation = DEFAULT_SERVER_INFO,
 ): Server {
   const server = new Server(
-    { name: "micromatrix-pi-body", version: "0.1.0" },
-    { capabilities: { tools: { listChanged: false } } },
+    serverInfo,
+    { capabilities: { tools: { listChanged: true } } },
   );
 
+  const unsubscribe = registry.subscribe(() => { void server.sendToolListChanged().catch(() => {}); });
+  server.onclose = unsubscribe;
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: registry.listTools().map(toMcpTool),
   }));
@@ -55,6 +68,7 @@ export function createProtocolServer(
 
     try {
       await gate?.authorize(request.params.name, request.params.arguments ?? {}, executionContext, extra.signal);
+      if (registry.getTool(request.params.name) !== tool) throw new Error("Tool definition changed during approval; submit a new tool call");
       const result = await tool.execute(
         randomUUID(),
         request.params.arguments ?? {},
@@ -62,6 +76,7 @@ export function createProtocolServer(
       );
       return toMcpResult(result);
     } catch (error) {
+      if (error instanceof ExternalMcpError) return error.result as CallToolResult;
       return {
         content: [
           {

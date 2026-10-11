@@ -17,6 +17,9 @@ export interface NetworkProviderOptionDto {
   label: string
   secret: boolean
   span: '1' | '2'
+  default_value?: string
+  description?: string
+  choices?: Array<{ value: string; label: string }>
 }
 
 export interface NetworkProviderDto {
@@ -38,9 +41,11 @@ export interface RuntimeDto {
   permission_mode: 'safe' | 'trusted' | 'dangerous'
   network: NetworkConfigDto
   running: boolean
+  stopping?: boolean
   public_mcp_url: string
   url_mode: string
   exit_reason: string
+  network_warning?: string
 }
 
 export interface RuntimeDraft {
@@ -54,6 +59,13 @@ export interface RuntimeDraft {
   remember_secrets: boolean
   permission_mode: 'safe' | 'trusted' | 'dangerous'
   network: NetworkDraft
+}
+
+// Available only over the native Tauri bridge, never the HTTP/MCP API.
+export interface SavedRuntimeSecrets {
+  oauth_password: string
+  provider: string
+  options: Record<string, string>
 }
 
 export interface NetworkDraft extends NetworkConfigDto {
@@ -109,6 +121,47 @@ export interface BodyPluginDto {
   name: string
   enabled: boolean
   required: boolean
+}
+
+export interface PiMcpConnectionDto {
+  id: string
+  name: string
+  enabled: boolean
+  transport: 'stdio' | 'http'
+  auth?: 'none' | 'oauth'
+  clientMetadataUrl?: string
+  oauthRedirectUri?: string
+  command: string
+  args: string[]
+  url: string
+  envRefs: Record<string, string>
+  headers: Record<string, string>
+}
+
+export interface ComputerUseStatusDto {
+  readonly browser?: { readonly endpoint: string; readonly allowedOrigins: readonly string[] };
+  enabled: boolean
+  allowActions: boolean
+  supported: boolean
+  available: boolean
+  platform: string
+  helperPath: string
+  running: boolean
+  connected: boolean
+  permission: { checkedHelperPid?: number; componentVersion?: string; nativeProtocol?: number; source?: 'probe' | 'runtime'; platform: 'macos' | 'windows'; helperPath: string; bundleId?: string; signingMode?: 'certificate' | 'ad-hoc'; accessibility?: boolean; screenRecording?: boolean; interactiveDesktop?: boolean; elevated?: boolean; promptRequested: boolean; requiresScreenRecording: false } | null
+  checkedAt: number
+  error: string
+  conflict: boolean
+}
+
+export interface PiSkillSourceDto { id: string; path: string; enabled: boolean }
+export interface PiExtensionConfigurationDto { mcp: PiMcpConnectionDto[]; skills: PiSkillSourceDto[] }
+export interface PiExtensionsDto {
+  configuration: PiExtensionConfigurationDto
+  running: boolean
+  host_active: boolean
+  mcp_status?: Record<string, { keys: string[]; oauth: string; status: string; message: string; discoveredAt: number }>
+  loaded_skills: Array<{ id: string; name: string; description: string; disableModelInvocation: boolean }>
 }
 
 export interface SkillSummaryDto {

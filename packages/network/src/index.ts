@@ -1,4 +1,4 @@
-export { CloudflareNetworkProvider } from "./cloudflare.js";
+export { CloudflareNetworkProvider, parseCloudflareProtocol } from "./cloudflare.js";
 export { ExternalNetworkProvider } from "./external.js";
 export { FrpNetworkProvider } from "./frp.js";
 export { NgrokNetworkProvider } from "./ngrok.js";
@@ -8,6 +8,7 @@ export {
   normalizeBaseUrl,
   providerResult,
   type CloudflareProviderOptions,
+  type CloudflareTunnelProtocol,
   type ExternalProviderOptions,
   type FrpProviderOptions,
   type NgrokProviderOptions,
@@ -16,3 +17,5 @@ export {
   type NetworkProviderContext,
   type NetworkProviderResult,
 } from "./types.js";
+
+export { probePublicService, waitForPublicService, NetworkHealthMonitor, PublicRouteError } from "./health.js";

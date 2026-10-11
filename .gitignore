@@ -2,6 +2,15 @@ node_modules/
 dist/
 dist-types/
 coverage/
+**/tests/
+**/test/
+**/__tests__/
+**/__snapshots__/
+**/test-results/
+**/playwright-report/
+*.test.*
+*.spec.*
+vitest.config.*
 *.tsbuildinfo
 
 .env
@@ -13,4 +22,10 @@ coverage/
 .vite/
 .cache/
 .tmp/
-src-tauri/binaries/
+.local/
+/.micromatrix-workbench/
+/.tmp-nvmd-ci/
+/.pnpm-store/
+apps/desktop/binaries/
+apps/desktop/resources/notices/
+apps/desktop/resources/automation/

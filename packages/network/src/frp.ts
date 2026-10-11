@@ -24,19 +24,21 @@ export class FrpNetworkProvider implements NetworkProvider {
   }
 
   async start(context: NetworkProviderContext): Promise<NetworkProviderResult> {
+    context.signal?.throwIfAborted();
     this.#process = new ManagedProcess(context.logger);
     this.#process.start(this.#options.executable, ["-c", this.#options.configFile], "frpc");
     await this.#process.waitFor(
-      (line) => /login to server success|start proxy success|start .*proxy/i.test(line),
+      (line) => /start proxy success/i.test(line),
       30_000,
       "FRP client connection",
+      context.signal,
     );
     this.#process.monitorUnexpectedExit(context.onUnexpectedExit);
     return providerResult(this.key, this.#options.publicUrl, "FRP");
   }
 
-  async stop(): Promise<void> {
-    await this.#process?.stop();
+  async stop(force = false): Promise<void> {
+    await this.#process?.stop(force);
     this.#process = undefined;
   }
 }

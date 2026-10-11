@@ -1,0 +1,17 @@
+{
+  "version": "2026.9.3",
+  "assets": {
+    "darwin-arm64": {
+      "name": "cloudflared-darwin-arm64.tgz",
+      "sha256": "587c2cfb1c230fe36c7fa7727da78be459dae028cabe8c001291999350f07095"
+    },
+    "darwin-x64": {
+      "name": "cloudflared-darwin-amd64.tgz",
+      "sha256": "d1155d0837487f261183b15c1eab6c4ebcad9dc49b94675f1524c3564cea3977"
+    },
+    "win32-x64": {
+      "name": "cloudflared-windows-amd64.exe",
+      "sha256": "f096265ec2fcbe9bb6e2d64268db167ced3fcbb83d894bdb9e2fcdb26f2ea7e2"
+    }
+  }
+}

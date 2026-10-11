@@ -11,10 +11,12 @@ import {
 import { useRoute, useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import type { AppRouteName } from '../router'
+import { useAppUpdater } from '../composables/useAppUpdater'
 
 const route = useRoute()
 const router = useRouter()
 const collapsed = ref(false)
+const updater = useAppUpdater()
 
 onMounted(() => {
   try {
@@ -59,6 +61,7 @@ function navClass(name: AppRouteName): string[] {
         <div class="grid size-9 flex-none place-items-center rounded-md border border-sidebar-border bg-background/40">
           <img src="/workbench-mark.svg" alt="" class="size-6 dark:invert" />
         </div>
+        <span class="truncate text-xs font-medium" title="micromatrix agent">micromatrix agent</span>
       </div>
       <Button v-if="!collapsed" variant="ghost" size="icon" class="h-7 w-7" title="收起侧边栏" @click="toggleCollapsed">
         <PanelLeftClose :size="15" />
@@ -104,6 +107,7 @@ function navClass(name: AppRouteName): string[] {
       >
         <Info class="flex-none" :size="16" :stroke-width="1.8" />
         <span v-if="!collapsed" class="leading-none">关于</span>
+        <span v-if="updater.updateAvailable.value" class="ml-auto size-1.5 rounded-full bg-destructive" aria-label="有新版本可更新" />
       </Button>
     </div>
   </aside>

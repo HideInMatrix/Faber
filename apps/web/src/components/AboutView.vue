@@ -1,5 +1,10 @@
 <script setup lang="ts">
-defineProps<{ version: string }>()
+import { Button } from '@/components/ui/button'
+import { FormField } from '@/components/ui/form'
+import type { UpdateState } from '../api/updateController'
+const prefix = defineModel<string>('prefix', { required: true })
+defineProps<{ version: string; update: UpdateState; native: boolean; busy: boolean; progress: number | null }>()
+defineEmits<{ check: []; install: []; restart: []; savePrefix: [] }>()
 </script>
 
 <template>
@@ -9,9 +14,32 @@ defineProps<{ version: string }>()
       <p class="mt-[3px] mb-0 text-xs leading-[18px] text-muted-foreground">应用与运行时信息</p>
     </div>
     <div class="mt-5 max-w-[430px] overflow-hidden rounded-lg border border-border bg-popover p-5 shadow-sm">
+      <div class="flex justify-between gap-4 border-b border-border py-2.5 text-[11px]"><span>应用名称</span><strong>micromatrix agent</strong></div>
       <div class="flex justify-between gap-4 border-b border-border py-2.5 text-[11px]"><span>当前版本</span><strong>{{ version || '—' }}</strong></div>
-      <div class="flex justify-between gap-4 border-b border-border py-2.5 text-[11px]"><span>执行核心</span><strong>Pi Agent</strong></div>
-      <p class="mt-3 mb-0 text-[10px] leading-4 text-muted-foreground">当前构建不包含自动更新。发布升级由安装包和发行渠道管理。</p>
+      <div class="mt-4 space-y-3 text-xs" aria-live="polite">
+        <template v-if="native">
+          <p v-if="update.lastCheckedAt" class="text-muted-foreground">上次检查：{{ new Date(update.lastCheckedAt).toLocaleString('zh-CN') }}</p>
+          <FormField label="GitHub 下载加速前缀">
+            <input v-model="prefix" :disabled="busy || update.phase === 'installed'" placeholder="留空则直连 GitHub" />
+          </FormField>
+          <Button size="sm" variant="outline" :disabled="busy || update.phase === 'installed'" @click="$emit('savePrefix')">保存前缀</Button>
+          <p v-if="update.phase === 'checking'">正在检查更新…</p>
+          <p v-else-if="update.phase === 'current'">当前已是最新正式版。</p>
+          <p v-else-if="update.version">新版本：<strong>{{ update.version }}</strong></p>
+          <p v-if="update.phase === 'downloading'">正在下载并验证签名：{{ progress === null ? `${Math.round(update.downloaded / 1024)} KB` : `${progress}%` }}</p>
+          <p v-if="update.phase === 'installing'">正在停止 Runtime / Tunnel 并安装更新…</p>
+          <p v-if="update.phase === 'installed'">更新已安装，重启应用后生效。</p>
+          <p v-if="update.error" class="text-destructive break-words">更新失败：{{ update.error }}</p>
+          <div class="flex flex-wrap gap-2">
+            <Button v-if="update.phase !== 'installed'" size="sm" variant="outline" :disabled="busy" @click="$emit('check')">检查更新</Button>
+            <Button v-if="update.version && ['available', 'error'].includes(update.phase)" size="sm" :disabled="busy" @click="$emit('install')">{{ update.phase === 'error' ? '重试更新并重启' : '下载更新并重启' }}</Button>
+            <Button v-if="update.phase === 'installed'" size="sm" @click="$emit('restart')">重启应用</Button>
+          </div>
+          <p v-if="update.version" class="text-muted-foreground">点击更新后，下载及签名验证成功才停止 Runtime 与 Tunnel，再安装并重启。请先保存工作；系统授权仍须完成，重启后需手动启动 Runtime。</p>
+          <details v-if="update.notes"><summary class="cursor-pointer">版本说明</summary><pre class="mt-2 max-h-48 overflow-auto whitespace-pre-wrap font-sans text-[11px]">{{ update.notes }}</pre></details>
+        </template>
+        <p v-else class="text-muted-foreground">Web 页面不支持安装桌面更新，请在桌面应用中检查更新。</p>
+      </div>
       <small class="mt-4 block text-[10px] text-muted-foreground">Copyright © micromatrix.org</small>
     </div>
   </section>

@@ -3,6 +3,8 @@ import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 
 import type { ApprovalMode } from "@micromatrix/approval";
+import { parseExtensions, type ExtensionConfiguration } from "@micromatrix/plugin-kit";
+import { builtinComputerUseConfiguration, type ComputerUseConfiguration } from "./builtin-computer-use.js";
 
 export type NetworkProviderKey = "external" | "cloudflare" | "frp" | "ngrok" | "tailscale";
 
@@ -17,6 +19,8 @@ export interface DaemonConfig {
   readonly rememberSecrets: boolean;
   readonly permissionMode: ApprovalMode;
   readonly plugins: { readonly shell: boolean };
+  readonly extensions?: ExtensionConfiguration;
+  readonly computerUse?: ComputerUseConfiguration;
   readonly controlHost: string;
   readonly controlPort: number;
   readonly network: {
@@ -27,6 +31,7 @@ export interface DaemonConfig {
 }
 
 interface SavedConfig {
+  readonly computerUse?: ComputerUseConfiguration;
   readonly name?: string;
   readonly workspace?: string;
   readonly host?: string;
@@ -35,6 +40,7 @@ interface SavedConfig {
   readonly rememberSecrets?: boolean;
   readonly permissionMode?: ApprovalMode;
   readonly plugins?: { readonly shell?: boolean };
+  readonly extensions?: ExtensionConfiguration;
   readonly network?: {
     readonly provider?: NetworkProviderKey;
     readonly publicUrl?: string;
@@ -72,6 +78,7 @@ function saved(path: string): SavedConfig {
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
   const configFile = resolve(first(env, "MICROMATRIX_CONFIG_FILE") ?? `${homedir()}/.micromatrix-pi-mcp/runtime.json`);
   const disk = saved(configFile);
+  const builtin = builtinComputerUseConfiguration(disk.computerUse, parseExtensions(disk.extensions));
   const provider = (first(env, "MICROMATRIX_NETWORK_PROVIDER", "AGENT_RUNTIME_NETWORK_PROVIDER") ?? disk.network?.provider ?? "external").toLowerCase();
   if (!["external", "cloudflare", "frp", "ngrok", "tailscale"].includes(provider)) throw new Error(`Unsupported network provider: ${provider}`);
   const permissionMode = (first(env, "MICROMATRIX_PERMISSION_MODE") ?? disk.permissionMode ?? "safe") as ApprovalMode;
@@ -84,6 +91,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
   const optionEnv: Readonly<Record<string, string>> = {
     executable: first(env, "MICROMATRIX_TUNNEL_EXECUTABLE", "MICROMATRIX_CLOUDFLARED") ?? "",
     tunnel_token: first(env, "MICROMATRIX_TUNNEL_TOKEN", "AGENT_RUNTIME_TUNNEL_TOKEN") ?? "",
+    protocol: first(env, "MICROMATRIX_CLOUDFLARE_PROTOCOL") ?? "",
     auth_token: first(env, "MICROMATRIX_NGROK_AUTH_TOKEN") ?? "",
     config_file: first(env, "MICROMATRIX_FRP_CONFIG") ?? "",
   };
@@ -100,6 +108,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
     rememberSecrets: boolean(first(env, "MICROMATRIX_REMEMBER_SECRETS"), disk.rememberSecrets ?? true),
     permissionMode,
     plugins: { shell: boolean(first(env, "MICROMATRIX_ENABLE_SHELL"), disk.plugins?.shell ?? false) },
+    extensions: builtin.extensions,
+    computerUse: builtin.configuration,
     controlHost: first(env, "MICROMATRIX_CONTROL_HOST") ?? "127.0.0.1",
     controlPort,
     network: {
@@ -123,6 +133,8 @@ export function saveConfig(config: DaemonConfig, rememberSecrets: boolean): void
     rememberSecrets,
     permissionMode: config.permissionMode,
     plugins: config.plugins,
+    extensions: parseExtensions(config.extensions),
+    computerUse: config.computerUse ?? { enabled: false, allowActions: true },
     network: {
       provider: config.network.provider,
       ...(config.network.publicUrl ? { publicUrl: config.network.publicUrl } : {}),

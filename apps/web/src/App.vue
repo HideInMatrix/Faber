@@ -1,10 +1,22 @@
 <script setup lang="ts">
+import { onMounted, onBeforeUnmount } from 'vue'
+import { useAppUpdater } from './composables/useAppUpdater'
 import { RouterView } from 'vue-router'
 import { Toaster } from 'vue-sonner'
 import 'vue-sonner/style.css'
 import { Button } from '@/components/ui/button'
 import AppSidebar from './components/AppSidebar.vue'
 import { usePermissionRequests } from './composables/usePermissionRequests'
+
+const updater = useAppUpdater()
+let updateTimer: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  // Never replace a development shell with a production release.
+  if (!updater.native || import.meta.env.DEV) return
+  void updater.check()
+  updateTimer = setInterval(() => void updater.check(), 24 * 60 * 60 * 1000)
+})
+onBeforeUnmount(() => { if (updateTimer) clearInterval(updateTimer) })
 
 const {
   permissionResponding,

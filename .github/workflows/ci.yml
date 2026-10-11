@@ -13,17 +13,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  source-boundary:
+    # No npm install, package cache, private package, or registry credential.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22.23.3'
+          package-manager-cache: false
+      - run: node scripts/verify-source-boundary.mjs
+      - run: node --test scripts/test-distribution-privacy.mjs
+
   check:
+    # Never expose private packages or credentials to a public repository/PR.
+    if: github.event.repository.private == true && github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7, Node 24
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7, Node 24
         with:
           node-version: '22.23.3'
-          cache: npm
-      - run: npm ci
-      - run: node scripts/check-release-version.mjs
+          # Private package tarballs must not enter reusable public caches.
+          package-manager-cache: false
+          registry-url: https://npm.pkg.github.com
+          scope: '@hideinmatrix'
+      - name: Prepare application version
+        run: node scripts/release-version.mjs
+      - name: Install pinned private dependencies (trusted private job only)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.COMPUTER_USE_PACKAGES_TOKEN }}
+        shell: bash
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "Missing read-only COMPUTER_USE_PACKAGES_TOKEN; never fall back to a public package" >&2
+            exit 1
+          fi
+          npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify package and distribution boundaries without registry credentials
+        run: |
+          npm run verify:source-boundary
+          npm run verify:privacy
+          node scripts/verify-distribution.mjs
       - run: npm run check
+      - name: Reject high or critical dependency vulnerabilities
+        run: npm audit --audit-level=high --registry=https://registry.npmjs.org
+      - name: Bundle the service using the already checked frontend
+        run: npm run build:service -- --prebuilt-web

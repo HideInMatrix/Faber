@@ -1,0 +1,41 @@
+[package]
+name = "micromatrix-pi-mcp"
+version = "1.0.0"
+description = "Desktop control surface for the MicroMatrix Pi MCP runtime"
+authors = ["MicroMatrix"]
+repository = ""
+edition = "2024"
+rust-version = "1.90"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "micromatrix_pi_mcp_lib"
+# Desktop-only: main.rs links this Rust library. Mobile C ABI/static outputs
+# are not distribution inputs and must not be built by generic cargo builds.
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.0", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.12.0", features = [] }
+tauri-plugin-log = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+
+open = "5.4.4"
+
+# This crate is a desktop control shell, not the Node business runtime. Prefer
+# shorter release builds; do not enable expensive whole-program LTO or a single
+# codegen unit. Strip only Rust outputs, never the injected SEA/native helpers.
+[profile.release]
+opt-level = 2
+lto = "off"
+codegen-units = 16
+strip = "symbols"

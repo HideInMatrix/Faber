@@ -8,6 +8,7 @@ export interface NetworkProviderResult {
 }
 
 export interface NetworkProviderContext {
+  readonly signal?: AbortSignal;
   readonly localBaseUrl: string;
   readonly logger: PluginLogger;
   readonly onUnexpectedExit: (error: Error) => void;
@@ -17,17 +18,21 @@ export interface NetworkProvider {
   readonly key: string;
   preflight?(): Promise<void>;
   start(context: NetworkProviderContext): Promise<NetworkProviderResult>;
-  stop(): Promise<void>;
+  /** Force applies only to processes owned by this provider. */
+  stop(force?: boolean): Promise<void>;
 }
 
 export interface ExternalProviderOptions {
   readonly publicUrl: string;
 }
 
+export type CloudflareTunnelProtocol = "auto" | "http2" | "quic";
+
 export interface CloudflareProviderOptions {
   readonly executable: string;
   readonly publicUrl: string | undefined;
   readonly tunnelToken: string | undefined;
+  readonly protocol?: CloudflareTunnelProtocol | undefined;
 }
 
 export interface FrpProviderOptions {

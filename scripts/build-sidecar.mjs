@@ -2,13 +2,21 @@ import { execFileSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { nativeBuildTarget } from './build-platform.mjs'
+import { generateDependencyNotices } from './dependency-notices.mjs'
+import { prepareDesktopResources } from './prepare-desktop-resources.mjs'
+import { prepareCloudflared } from './prepare-cloudflared.mjs'
+import { prepareComputerUse } from './prepare-computer-use.mjs'
 
 const root = process.cwd()
 const triple = nativeBuildTarget()
-execFileSync(process.execPath, ['scripts/build-service.mjs'], { cwd: root, stdio: 'inherit' })
+await prepareCloudflared(root)
+prepareComputerUse(root)
+const serviceArgs = ['scripts/build-service.mjs']
+if (process.argv.includes('--prebuilt-web')) serviceArgs.push('--prebuilt-web')
+execFileSync(process.execPath, serviceArgs, { cwd: root, stdio: 'inherit' })
 
 const extension = process.platform === 'win32' ? '.exe' : ''
-const outputDir = path.join(root, 'src-tauri/binaries')
+const outputDir = path.join(root, 'apps/desktop/binaries')
 const target = path.join(outputDir, `micromatrix-service-${triple}${extension}`)
 const blob = path.join(root, 'dist/micromatrix-service.blob')
 const config = path.join(root, 'dist/sea-config.json')
@@ -29,4 +37,7 @@ const args = [postject, target, 'NODE_SEA_BLOB', blob, '--sentinel-fuse', 'NODE_
 if (process.platform === 'darwin') args.push('--macho-segment-name', 'NODE_SEA')
 execFileSync(process.execPath, args, { stdio: 'inherit' })
 if (process.platform === 'darwin') execFileSync('codesign', ['--sign', '-', target], { stdio: 'inherit' })
+execFileSync('cargo', ['fetch', '--manifest-path', path.join(root, 'apps/desktop/Cargo.toml'), '--locked', '--target', triple], { stdio: 'inherit' })
+generateDependencyNotices(root)
+prepareDesktopResources(root)
 console.log(`Built Tauri sidecar ${path.relative(root, target)}`)

@@ -6,7 +6,6 @@ import { CheckField, FormField, FormGrid } from '@/components/ui/form'
 import { InputGroup, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import type { NetworkProviderDto, RuntimeDraft } from '../../types'
 import PermissionModeField from './PermissionModeField.vue'
-import BodyPluginEditor from './BodyPluginEditor.vue'
 
 const draft = defineModel<RuntimeDraft>('draft', { required: true })
 const tunnelTokenVisible = defineModel<boolean>('tunnelTokenVisible', { required: true })
@@ -15,6 +14,7 @@ const props = defineProps<{
   locked: boolean
   busy: boolean
   lifecycleBusy: boolean
+  lifecycleAction: 'start' | 'stop' | null
   selectedRunning: boolean
   copiedUrl: string
   runtimeUrl: string
@@ -30,8 +30,15 @@ function secretConfigured(key: string) {
   return draft.value.network.configured_secrets.includes(key)
 }
 
-function updateNetworkSecret(key: string) {
-  draft.value.network.secret_actions[key] = draft.value.network.options[key] ? 'set' : 'unchanged'
+function updateNetworkChoice(key: string, event: Event) {
+  draft.value.network.options[key] = (event.target as HTMLSelectElement).value
+}
+
+// Use the emitted new value: a forwarded native input listener can run before
+// v-model updates, misclassifying a first paste as an unchanged empty secret.
+function updateNetworkSecret(key: string, value: string) {
+  draft.value.network.options[key] = value
+  draft.value.network.secret_actions[key] = value ? 'set' : 'unchanged'
 }
 
 function toggleNetworkSecretClear(key: string) {
@@ -40,8 +47,9 @@ function toggleNetworkSecretClear(key: string) {
   draft.value.network.secret_actions[key] = clearing ? 'unchanged' : 'clear'
 }
 
-function updateOAuthPassword() {
-  draft.value.oauth_password_action = draft.value.oauth_password ? 'set' : 'unchanged'
+function updateOAuthPassword(value: string) {
+  draft.value.oauth_password = value
+  draft.value.oauth_password_action = value ? 'set' : 'unchanged'
 }
 
 function toggleOAuthPasswordClear() {
@@ -61,24 +69,7 @@ const emit = defineEmits<{
 
 <template>
   <section class="overflow-hidden rounded-lg border border-border bg-popover p-4 shadow-sm">
-    <div class="mb-4 flex items-center justify-between gap-3.5">
-      <div>
-        <h2 class="m-0 text-[13px] leading-5 font-medium">Runtime 设置</h2>
-        <p class="mt-px mb-0 text-[11px] leading-4 text-muted-foreground">
-          配置 Pi Runtime、OAuth、审批策略、插件与公网隧道；当前 Runtime 由启动/停止按钮控制。
-        </p>
-      </div>
-      <span
-        :class="[
-          'inline-flex min-h-[22px] items-center whitespace-nowrap rounded-full px-2 text-[10px] font-medium',
-          selectedRunning
-            ? 'bg-success/10 text-success'
-            : 'bg-secondary text-muted-foreground',
-        ]"
-      >
-        {{ selectedRunning ? '运行中' : '已停止' }}
-      </span>
-    </div>
+    <h2 class="mb-4 text-sm font-medium">Runtime 设置</h2>
 
     <FormGrid>
       <FormField label="Runtime 名称" span="2">
@@ -126,12 +117,12 @@ const emit = defineEmits<{
         <div v-if="field.secret" class="grid gap-1.5">
           <InputGroup>
             <InputGroupInput
-              v-model="draft.network.options[field.key]"
+              :model-value="draft.network.options[field.key]"
               :disabled="locked || draft.network.secret_actions[field.key] === 'clear'"
               :type="tunnelTokenVisible ? 'text' : 'password'"
               autocomplete="new-password"
               placeholder="留空则保留现有值"
-              @input="updateNetworkSecret(field.key)"
+              @update:model-value="updateNetworkSecret(field.key, $event)"
             />
             <InputGroupButton
               :aria-label="tunnelTokenVisible ? '隐藏网络密钥' : '显示网络密钥'"
@@ -146,10 +137,17 @@ const emit = defineEmits<{
               @click="toggleNetworkSecretClear(field.key)"
             ><RotateCcw v-if="draft.network.secret_actions[field.key] === 'clear'" :size="15" /><Trash2 v-else :size="15" /></InputGroupButton>
           </InputGroup>
-          <span class="text-[10px] text-muted-foreground">
-            {{ draft.network.secret_actions[field.key] === 'clear' ? '保存后清除' : draft.network.secret_actions[field.key] === 'set' ? '保存后替换' : secretConfigured(field.key) ? '已配置 · 留空保留' : '未配置' }}
-          </span>
         </div>
+        <select
+          v-else-if="field.choices"
+          :value="draft.network.options[field.key] || field.default_value"
+          :disabled="locked"
+          @change="updateNetworkChoice(field.key, $event)"
+        >
+          <option v-for="choice in field.choices" :key="choice.value" :value="choice.value">
+            {{ choice.label }}
+          </option>
+        </select>
         <input
           v-else
           v-model.trim="draft.network.options[field.key]"
@@ -157,18 +155,22 @@ const emit = defineEmits<{
           type="text"
           autocomplete="off"
         />
+        <details v-if="field.description" class="text-xs font-normal text-muted-foreground">
+          <summary class="cursor-pointer">配置说明</summary>
+          <p class="mt-1 leading-5">{{ field.description }}</p>
+        </details>
       </FormField>
 
       <FormField label="OAuth 密码">
         <div class="grid gap-1.5">
           <InputGroup>
             <InputGroupInput
-              v-model="draft.oauth_password"
+              :model-value="draft.oauth_password"
               :disabled="locked || draft.oauth_password_action === 'clear'"
               :type="oauthPasswordVisible ? 'text' : 'password'"
               autocomplete="new-password"
               placeholder="留空则保留现有值"
-              @input="updateOAuthPassword"
+              @update:model-value="updateOAuthPassword"
             />
             <InputGroupButton
               :aria-label="oauthPasswordVisible ? '隐藏 OAuth 密码' : '显示 OAuth 密码'"
@@ -183,18 +185,12 @@ const emit = defineEmits<{
               @click="toggleOAuthPasswordClear"
             ><RotateCcw v-if="draft.oauth_password_action === 'clear'" :size="15" /><Trash2 v-else :size="15" /></InputGroupButton>
           </InputGroup>
-          <span class="text-[10px] text-muted-foreground">
-            {{ draft.oauth_password_action === 'clear' ? '保存后清除' : draft.oauth_password_action === 'set' ? '保存后替换' : draft.oauth_password_configured ? '已配置 · 留空保留' : '未配置' }}
-          </span>
         </div>
       </FormField>
 
       <PermissionModeField v-model="draft.permission_mode" :disabled="locked" />
 
       <CheckField span="2"><input v-model="draft.remember_secrets" type="checkbox" /><span>在本机保存网络令牌与 OAuth 密码</span></CheckField>
-      <div class="col-span-2 min-w-0">
-        <BodyPluginEditor :locked="locked" />
-      </div>
     </FormGrid>
 
     <div v-if="runtimeUrl" class="mt-4 flex items-center gap-2 rounded-md border border-border bg-secondary/50 px-3 py-[9px]">
@@ -209,12 +205,12 @@ const emit = defineEmits<{
         <Button
           :variant="selectedRunning ? 'destructiveOutline' : 'default'"
           size="sm"
-          :disabled="busy || lifecycleBusy"
+          :disabled="busy || lifecycleAction === 'stop'"
           @click="emit('toggleRunning')"
         >
-          <Square v-if="selectedRunning" :size="13" />
+          <Square v-if="selectedRunning || lifecycleAction === 'start'" :size="13" />
           <Play v-else :size="13" />
-          {{ lifecycleBusy ? (selectedRunning ? '停止中…' : '启动中…') : (selectedRunning ? '停止' : '启动') }}
+          {{ lifecycleAction === 'stop' ? '停止中…' : lifecycleAction === 'start' ? '取消启动' : selectedRunning ? '停止' : '启动' }}
         </Button>
         <Button variant="outline" size="sm" :disabled="busy || lifecycleBusy || locked" @click="emit('save')">
           保存
