@@ -1,0 +1,61 @@
+name: Recover Faber release
+run-name: 恢复 Faber 发布 · 复用已验证安装包
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths: [.github/workflows/recover-faber-release.yml]
+
+permissions:
+  contents: read
+
+# Share the tag publication lock, including with the original desktop workflow.
+concurrency:
+  group: desktop-refs/tags/v1.0.0
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    if: github.event.repository.private == true && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: v1.0.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22.23.3'
+          package-manager-cache: false
+      - name: Test bounded queries and recovery gates
+        run: node --test scripts/test-brand.mjs scripts/test-release-recovery.mjs
+      - name: Verify original tag build and its successful native jobs
+        id: source
+        run: node scripts/recover-faber-release.mjs
+      - name: Download only the original desktop artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.source.outputs.run_id }}
+          pattern: micromatrix-*
+          path: build-artifacts
+          merge-multiple: true
+      - name: Verify artifact source, target, version and workflow provenance
+        env:
+          RECOVERY_RUN_ID: ${{ steps.source.outputs.run_id }}
+        run: node scripts/recover-faber-release.mjs
+      - name: Verify original package checksums and updater signatures
+        run: |
+          node --input-type=module -e 'import { prepareReleaseAssets } from "./scripts/prepare-release-assets.mjs"; prepareReleaseAssets(undefined, undefined, { tag: process.env.RELEASE_TAG })'
+      - name: Replace only the explicitly superseded legacy-brand release
+        run: node scripts/replace-legacy-brand-release.mjs
+      - name: Publish the existing verified installers without rebuilding
+        run: bash scripts/publish-desktop-release.sh
