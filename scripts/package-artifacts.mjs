@@ -96,7 +96,6 @@ export function packageArtifacts(root = process.cwd(), env = process.env) {
     copyFileSync(nodeLicense, path.join(serviceDirectory, 'NODE_LICENSE'))
     for (const [source, destination] of [
       ['README.md', 'README.md'], ['.env.example', '.env.example'],
-      ['THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_NOTICES.md'],
       ['third_party/pi/LICENSE', 'PI_LICENSE'], ['.github/release-notes.md', 'KNOWN_LIMITS.md'],
       ['third_party/cloudflared/LICENSE', 'CLOUDFLARED_LICENSE'],
     ]) copyFileSync(path.join(root, source), path.join(serviceDirectory, destination))
@@ -119,7 +118,6 @@ export function packageArtifacts(root = process.cwd(), env = process.env) {
     const name = `${profile}-${path.basename(installer).replace(/\s+/g, '_')}`
     copyFileSync(installer, path.join(output, name))
   }
-  copyFileSync(path.join(root, 'THIRD_PARTY_NOTICES.md'), path.join(output, `THIRD_PARTY_NOTICES-${profile}.md`))
   copyFileSync(nodeLicense, path.join(output, `NODE_LICENSE-${profile}.txt`))
   copyFileSync(path.join(root, 'third_party/pi/LICENSE'), path.join(output, `PI_LICENSE-${profile}.txt`))
   writeFileSync(path.join(output, `build-${profile}.json`), `${JSON.stringify({

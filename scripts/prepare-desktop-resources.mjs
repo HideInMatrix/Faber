@@ -12,7 +12,6 @@ export function prepareDesktopResources(root = process.cwd()) {
     [path.join(root, 'third_party/pi/LICENSE'), 'PI_LICENSE.txt'],
     [path.join(root, 'third_party/cloudflared/LICENSE'), 'CLOUDFLARED_LICENSE.txt'],
     ...computerUseNoticeSources,
-    [path.join(root, 'THIRD_PARTY_NOTICES.md'), 'THIRD_PARTY_NOTICES.md'],
     [path.join(root, '.github/release-notes.md'), 'KNOWN_LIMITS.md'],
   ]
   for (const [source] of sources) {
