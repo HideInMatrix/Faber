@@ -73,7 +73,7 @@ const emit = defineEmits<{
 
     <FormGrid>
       <FormField label="Runtime 名称" span="2">
-        <input v-model.trim="draft.name" :disabled="locked" placeholder="例如：Pi MCP Runtime" />
+        <input v-model.trim="draft.name" :disabled="locked" placeholder="例如：Faber Runtime" />
       </FormField>
       <FormField label="本地端口">
         <input v-model.number="draft.port" :disabled="locked" type="number" min="1" max="65535" />

@@ -14,7 +14,7 @@ defineEmits<{ check: []; install: []; restart: []; savePrefix: [] }>()
       <p class="mt-[3px] mb-0 text-xs leading-[18px] text-muted-foreground">应用与运行时信息</p>
     </div>
     <div class="mt-5 max-w-[430px] overflow-hidden rounded-lg border border-border bg-popover p-5 shadow-sm">
-      <div class="flex justify-between gap-4 border-b border-border py-2.5 text-[11px]"><span>应用名称</span><strong>micromatrix agent</strong></div>
+      <div class="flex justify-between gap-4 border-b border-border py-2.5 text-[11px]"><span>应用名称</span><strong>Faber</strong></div>
       <div class="flex justify-between gap-4 border-b border-border py-2.5 text-[11px]"><span>当前版本</span><strong>{{ version || '—' }}</strong></div>
       <div class="mt-4 space-y-3 text-xs" aria-live="polite">
         <template v-if="native">

@@ -273,7 +273,7 @@ export class LocalOAuthServer implements McpAuthorization {
       resource: `${origin}/mcp`,
       authorization_servers: [origin],
       scopes_supported: ["mcp"],
-      resource_name: "MicroMatrix Pi MCP",
+      resource_name: "Faber Runtime",
     });
   }
 

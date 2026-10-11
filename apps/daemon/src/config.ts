@@ -99,7 +99,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
 
   return {
     configFile,
-    name: first(env, "MICROMATRIX_NAME") ?? disk.name ?? "Pi MCP Runtime",
+    name: first(env, "MICROMATRIX_NAME") ?? disk.name ?? "Faber Runtime",
     workspace: resolve(first(env, "MICROMATRIX_WORKSPACE", "AGENT_RUNTIME_WORKSPACE") ?? disk.workspace ?? "."),
     host: first(env, "MICROMATRIX_HOST", "AGENT_RUNTIME_HOST") ?? disk.host ?? "127.0.0.1",
     port: runtimePort,

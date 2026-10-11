@@ -25,7 +25,7 @@ function emptyNetworkDraft(): NetworkDraft {
 
 export function emptyRuntimeDraft(): RuntimeDraft {
   return {
-    name: 'Pi MCP Runtime',
+    name: 'Faber Runtime',
     workspace: '',
     oauth_password: '',
     oauth_password_configured: false,

@@ -61,7 +61,7 @@ export function packageArtifacts(root = process.cwd(), env = process.env) {
   if (!existsSync(path.join(automation, 'playwright-core/index.js'))) throw new Error('Missing bundled Playwright runtime; rebuild the service')
   const dependencyNotices = path.join(root, 'apps/desktop/resources/notices/dependencies')
   if (!existsSync(path.join(dependencyNotices, 'DEPENDENCIES.json'))) throw new Error('Missing bundled dependency notice inventory')
-  const application = path.join(root, 'apps/desktop/binaries/micromatrix Computer Use.app')
+  const application = path.join(root, 'apps/desktop/binaries/Faber Computer Use.app')
   const computer = path.join(root, 'apps/desktop/binaries', `micromatrix-computer-${target}${extension}`)
   if (process.platform === 'darwin' && !existsSync(path.join(application, 'Contents/MacOS/micromatrix-computer'))) throw new Error('Missing bundled Computer Use application')
   if (process.platform === 'win32' && !existsSync(computer)) throw new Error('Missing bundled Computer Use native helper')
@@ -88,7 +88,7 @@ export function packageArtifacts(root = process.cwd(), env = process.env) {
     if (process.platform === 'darwin') {
       // Preserve the signed bundle in internal Actions archives too. The macOS
       // service now launches this application, not the intermediate bare helper.
-      execFileSync('/usr/bin/ditto', [application, path.join(serviceDirectory, 'micromatrix Computer Use.app')], { stdio: 'inherit' })
+      execFileSync('/usr/bin/ditto', [application, path.join(serviceDirectory, 'Faber Computer Use.app')], { stdio: 'inherit' })
     } else if (process.platform === 'win32') {
       copyFileSync(computer, path.join(serviceDirectory, `micromatrix-computer${extension}`))
     }

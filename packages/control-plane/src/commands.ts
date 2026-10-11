@@ -325,7 +325,7 @@ export class DesktopCommandRouter {
         .map(([key, item]) => [key, parseSecretUpdate(item, `network.${key}`)]))
       : {};
     return {
-      name: String(Reflect.get(value, "name") ?? "Pi MCP Runtime"),
+      name: String(Reflect.get(value, "name") ?? "Faber Runtime"),
       workspace: String(Reflect.get(value, "workspace") ?? ""),
       host: String(Reflect.get(value, "host") ?? "127.0.0.1"),
       port: Number(Reflect.get(value, "port") ?? 8234),

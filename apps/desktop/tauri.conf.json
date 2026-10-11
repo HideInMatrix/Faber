@@ -1,6 +1,6 @@
 {
   "$schema": "../../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "micromatrix agent",
+  "productName": "Faber",
   "version": "1.0.0",
   "identifier": "org.micromatrix.pi-mcp",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "micromatrix agent",
+        "title": "Faber",
         "width": 1180,
         "height": 780,
         "minWidth": 960,
@@ -35,6 +35,9 @@
     "windows": {
       "nsis": {
         "installMode": "currentUser"
+      },
+      "wix": {
+        "upgradeCode": "973493ad-2108-569d-b07f-7206f8f35dc6"
       }
     },
     "macOS": {

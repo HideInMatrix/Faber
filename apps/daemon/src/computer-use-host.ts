@@ -19,7 +19,7 @@ export function computerUseHelperPath(): string {
   if (isSea()) {
     const directory = dirname(process.execPath);
     if (platform.os === "darwin") return join(directory, basename(directory) === "MacOS"
-      ? "../Helpers/micromatrix Computer Use.app" : "micromatrix Computer Use.app");
+      ? "../Helpers/Faber Computer Use.app" : "Faber Computer Use.app");
     const suffix = basename(process.execPath, ".exe").slice("micromatrix-service".length);
     return join(directory, `micromatrix-computer${suffix.startsWith("-") ? suffix : ""}.exe`);
   }
@@ -27,7 +27,7 @@ export function computerUseHelperPath(): string {
   const binaries = source.endsWith(".cjs")
     ? resolve(dirname(source), "../apps/desktop/binaries")
     : resolve(dirname(source), "../../desktop/binaries");
-  return join(binaries, platform.os === "darwin" ? "micromatrix Computer Use.app" : `micromatrix-computer-${triple}.exe`);
+  return join(binaries, platform.os === "darwin" ? "Faber Computer Use.app" : `micromatrix-computer-${triple}.exe`);
 }
 
 /** Compose the package's public APIs with the host's explicit helper path. */

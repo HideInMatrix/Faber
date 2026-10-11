@@ -13,7 +13,7 @@ async function main(): Promise<void> {
   const logger = new BufferedPluginLogger();
   const runtime = new RuntimeSupervisor(config, logger);
   const control = new ControlPlaneHttpService({
-    appName: "micromatrix agent",
+    appName: "Faber",
     version: APP_VERSION,
     host: config.controlHost,
     port: config.controlPort,

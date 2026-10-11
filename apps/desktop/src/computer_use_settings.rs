@@ -12,11 +12,11 @@ const SETTINGS: &str = "x-apple.systempreferences:com.apple.preference.security?
 #[cfg(target_os = "macos")]
 fn application() -> Result<std::path::PathBuf, String> {
   let application = if cfg!(debug_assertions) {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries/micromatrix Computer Use.app")
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries/Faber Computer Use.app")
   } else {
     std::env::current_exe().map_err(|error| error.to_string())?.parent()
       .and_then(|directory| directory.parent()).ok_or("Invalid desktop application path")?
-      .join("Helpers/micromatrix Computer Use.app")
+      .join("Helpers/Faber Computer Use.app")
   };
   if !application.join("Contents/MacOS/micromatrix-computer").is_file() {
     return Err("Computer Use application bundle is missing".into());

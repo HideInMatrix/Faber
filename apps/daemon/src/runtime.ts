@@ -373,7 +373,7 @@ export class RuntimeSupervisor implements RuntimeControl {
       }
       const candidate: DaemonConfig = {
         ...previous,
-        name: update.name || "Pi MCP Runtime",
+        name: update.name || "Faber Runtime",
         workspace: update.workspace,
         host: update.host,
         port: update.port,
@@ -616,7 +616,7 @@ export class RuntimeSupervisor implements RuntimeControl {
       registry,
       logger: this.#logger,
       executionGate: this.approval,
-      serverInfo: { name: "micromatrix agent", version: APP_VERSION },
+      serverInfo: { name: "Faber", version: APP_VERSION },
     });
   }
 

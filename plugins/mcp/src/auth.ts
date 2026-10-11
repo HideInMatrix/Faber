@@ -148,7 +148,7 @@ export class McpAuthStore {
     return {
       get redirectUrl() { return identity.redirect.href; },
       clientMetadataUrl: identity.clientId,
-      get clientMetadata() { return { client_name: "micromatrix agent", redirect_uris: [String(this.redirectUrl)], grant_types: ["authorization_code", "refresh_token"], response_types: ["code"], token_endpoint_auth_method: "none" }; },
+      get clientMetadata() { return { client_name: "Faber", redirect_uris: [String(this.redirectUrl)], grant_types: ["authorization_code", "refresh_token"], response_types: ["code"], token_endpoint_auth_method: "none" }; },
       state: () => interactive?.state ?? "",
       clientInformation: () => {
         if (!interactive && (!get()?.tokens || get()?.client?.client_id !== identity.clientId)) throw new Error(`MCP ${config.id} requires CIMD OAuth login; use the extension Login button`);
@@ -229,7 +229,7 @@ export class McpAuthStore {
       exchanging = true;
       void auth(provider, { serverUrl: config.url, authorizationCode: url.searchParams.get("code")!, fetchFn: this.fetchOAuth }).then(result => {
         if (result !== "AUTHORIZED") throw new Error("OAuth exchange incomplete");
-        login.status = "authorized"; login.message = ""; delete login.previous; response.end("授权完成，可以关闭此页面并返回 micromatrix agent。");
+        login.status = "authorized"; login.message = ""; delete login.previous; response.end("授权完成，可以关闭此页面并返回 Faber。");
       }).catch(() => { this.cancel(config.id, false); login.status = "failed"; login.message = "OAuth token exchange failed; retry login"; response.writeHead(400).end(login.message); })
         .finally(() => { clearTimeout(login.timer); server.close(); });
     });

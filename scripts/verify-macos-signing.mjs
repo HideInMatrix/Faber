@@ -10,7 +10,7 @@ export function verifyMacosSigning(application, env = process.env, run = execFil
   run('/usr/bin/codesign', ['--verify', '--deep', '--strict', application], { stdio: 'inherit' })
   if (buildChannel(env) !== 'release') return
   const identifier = JSON.parse(readFileSync(new URL('../apps/desktop/tauri.conf.json', import.meta.url), 'utf8')).identifier
-  const helper = path.join(application, 'Contents/Helpers/micromatrix Computer Use.app')
+  const helper = path.join(application, 'Contents/Helpers/Faber Computer Use.app')
   for (const [target, id] of [[application, identifier], [helper, 'org.micromatrix.computer-use']]) {
     run('/usr/bin/codesign', ['--verify', '--strict', '--test-requirement', macReleaseRequirement(env, id), target], { stdio: 'inherit' })
     const dr = run('/usr/bin/codesign', ['-d', '-r-', target], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })

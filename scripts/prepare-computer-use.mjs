@@ -20,7 +20,7 @@ export function prepareComputerUse(root = process.cwd()) {
   copyFileSync(resource.binary, output)
   chmodSync(output, 0o755)
   if (!windows) {
-    const application = path.join(root, 'apps/desktop/binaries/micromatrix Computer Use.app')
+    const application = path.join(root, 'apps/desktop/binaries/Faber Computer Use.app')
     rmSync(application, { recursive: true, force: true })
     cpSync(resource.application, application, { recursive: true })
     assertDistributionTree(application)
@@ -32,7 +32,7 @@ export function prepareComputerUse(root = process.cwd()) {
     const version = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')).version
     const plist = readFileSync(path.join(computerUsePackageRoot, 'assets/macos/Info.plist'), 'utf8')
       .replaceAll('{{BUNDLE_ID}}', `org.micromatrix.computer-use${release ? '' : '.dev'}`)
-      .replaceAll('{{DISPLAY_NAME}}', `micromatrix Computer Use${release ? '' : ' Dev'}`)
+      .replaceAll('{{DISPLAY_NAME}}', `Faber Computer Use${release ? '' : ' Dev'}`)
       .replaceAll('{{VERSION}}', version)
     writeFileSync(path.join(contents, 'Info.plist'), plist)
     // A cryptographic certificate pin + identifier, never identifier alone.
