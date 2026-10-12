@@ -1,6 +1,6 @@
 {
   "name": "faber-workbench",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "packageManager": "npm@11",
@@ -27,14 +27,15 @@
     "start": "node apps/daemon/dist/main.js",
     "typecheck": "tsc -b --pretty false",
     "typecheck:web": "node scripts/check-web-types.mjs -p apps/web/tsconfig.sfc.json --pretty false",
-    "check": "npm run typecheck && npm run typecheck:web && npm run build:web && npm run verify:brand",
+    "check": "npm run typecheck && npm run typecheck:web && npm run build:web && npm run verify:brand && npm run verify:network-health",
     "prepare:version": "node scripts/release-version.mjs",
     "notices": "node scripts/dependency-notices.mjs",
     "verify:source-boundary": "node scripts/verify-source-boundary.mjs",
     "verify:privacy": "node --test scripts/test-distribution-privacy.mjs",
     "clean:maps": "node scripts/clean-source-maps.mjs",
     "verify:package-integration": "node scripts/test-computer-use-package-integration.mjs",
-    "verify:brand": "node --test scripts/test-brand.mjs"
+    "verify:brand": "node --test scripts/test-brand.mjs",
+    "verify:network-health": "node --test scripts/test-network-health.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.87.1",

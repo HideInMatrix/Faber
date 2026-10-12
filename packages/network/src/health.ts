@@ -4,25 +4,63 @@ export class PublicRouteError extends Error {
   constructor(readonly code: string, message: string) { super(message); this.name = "PublicRouteError"; }
 }
 
+/** Cancellation must settle our waiter even if DNS/fetch/body I/O does not
+ * acknowledge abort after a suspend/resume. The losing operation retains a
+ * rejection handler, so a late failure cannot become an unhandled rejection. */
+async function abortable<T>(operation: () => Promise<T>, signal: AbortSignal): Promise<T> {
+  signal.throwIfAborted();
+  let onAbort!: () => void;
+  const cancelled = new Promise<never>((_, reject) => {
+    onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+  try {
+    return await Promise.race([Promise.resolve().then(() => {
+      signal.throwIfAborted();
+      return operation();
+    }), cancelled]);
+  } finally { signal.removeEventListener("abort", onAbort); }
+}
+
 /** An owned service nonce, not just HTTP 200 or a printed URL. No credentials
  * are sent. Redirects and unbounded bodies are refused. */
 export async function probePublicService(base: string, instanceId: string, signal?: AbortSignal): Promise<void> {
   try {
     const abort = AbortSignal.timeout(3000);
-    const response = await fetch(`${base}/healthz`, { redirect: "error", headers: { "ngrok-skip-browser-warning": "1" },
-      signal: signal ? AbortSignal.any([signal, abort]) : abort });
-    if (!response.ok) { await response.body?.cancel(); throw new PublicRouteError("http_error", `Public health returned HTTP ${response.status}`); }
-    if (!response.headers.get("content-type")?.includes("application/json")) { await response.body?.cancel(); throw new PublicRouteError("unexpected_content_type", "Public route did not return service health JSON"); }
-    let size = 0; const chunks: Uint8Array[] = [];
-    if (response.body) for await (const chunk of response.body) {
-      size += chunk.length;
-      if (size > 16384) throw new PublicRouteError("response_too_large", "Public health response exceeded limit");
-      chunks.push(chunk);
-    }
-    let health: unknown;
-    try { health = JSON.parse(Buffer.concat(chunks).toString("utf8")); }
-    catch { throw new PublicRouteError("invalid_json", "Public health returned invalid JSON"); }
-    if (!health || typeof health !== "object" || Reflect.get(health, "ok") !== true || Reflect.get(health, "instance_id") !== instanceId) throw new PublicRouteError("instance_mismatch", "Public route reaches a different service instance");
+    const bounded = signal ? AbortSignal.any([signal, abort]) : abort;
+    await abortable(async () => {
+      const response = await fetch(`${base}/healthz`, { redirect: "error", headers: { "ngrok-skip-browser-warning": "1" }, signal: bounded });
+      // Cancel unread bodies without awaiting cancellation-insensitive I/O.
+      const cancelBody = () => { void response.body?.cancel().catch(() => {}); };
+      if (bounded.aborted) { cancelBody(); bounded.throwIfAborted(); }
+      if (!response.ok) { cancelBody(); throw new PublicRouteError("http_error", `Public health returned HTTP ${response.status}`); }
+      if (!response.headers.get("content-type")?.includes("application/json")) { cancelBody(); throw new PublicRouteError("unexpected_content_type", "Public route did not return service health JSON"); }
+      let size = 0; const chunks: Uint8Array[] = [];
+      const reader = response.body?.getReader();
+      if (reader) {
+        const cancelReader = () => { void reader.cancel().catch(() => {}); };
+        bounded.addEventListener("abort", cancelReader, { once: true });
+        try {
+          while (true) {
+            bounded.throwIfAborted();
+            const { done, value } = await reader.read();
+            bounded.throwIfAborted();
+            if (done) break;
+            size += value.length;
+            if (size > 16384) throw new PublicRouteError("response_too_large", "Public health response exceeded limit");
+            chunks.push(value);
+          }
+        } finally {
+          bounded.removeEventListener("abort", cancelReader);
+          cancelReader();
+          reader.releaseLock();
+        }
+      }
+      let health: unknown;
+      try { health = JSON.parse(Buffer.concat(chunks).toString("utf8")); }
+      catch { throw new PublicRouteError("invalid_json", "Public health returned invalid JSON"); }
+      if (!health || typeof health !== "object" || Reflect.get(health, "ok") !== true || Reflect.get(health, "instance_id") !== instanceId) throw new PublicRouteError("instance_mismatch", "Public route reaches a different service instance");
+    }, bounded);
   } catch (error) {
     if (signal?.aborted) throw signal.reason;
     if (error instanceof PublicRouteError) throw error;
@@ -42,7 +80,8 @@ export async function waitForPublicService(base: string, instanceId: string, sig
   } while (Date.now() < deadline);
   throw new Error("Public route did not become reachable");
 }
-/** Serial probes, no overlap. Stop aborts requests and drains the monitor. */
+/** Serial probes, no overlap while running. Stop cancels the monitor without
+ * waiting indefinitely for cancellation-insensitive network I/O to finish. */
 export interface NetworkHealthMonitorOptions {
   readonly keepRunningOnFailure?: boolean;
   readonly onProbeResult?: (result: { ok: boolean; failures: number; error?: Error }) => void;
@@ -61,7 +100,7 @@ export class NetworkHealthMonitor {
       while (!this.#controller.signal.aborted) {
         await delay(this.intervalMs, undefined, { signal: this.#controller.signal, ref: false });
         try {
-          await this.probe(this.#controller.signal);
+          await abortable(() => this.probe(this.#controller.signal), this.#controller.signal);
           if (this.#controller.signal.aborted) return;
           failures = 0; this.options.onProbeResult?.({ ok: true, failures });
         } catch (error) {
