@@ -36,14 +36,16 @@ concurrency:
 
 jobs:
   verify:
-    # Never expose private packages or credentials to a public repository/PR.
-    if: github.event.repository.private == true && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+    # Public builds require this repository's owner-pushed version tag. PRs,
+    # forks, public branch pushes and public manual builds cannot use secrets.
+    if: github.repository == 'HideInMatrix/micromatrix-workbench' && ((github.event.repository.private == true && github.ref == 'refs/heads/master') || (github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && github.actor == github.repository_owner))
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7, Node 24
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7, Node 24
         with:
           node-version: '22.23.3'
@@ -51,6 +53,9 @@ jobs:
           package-manager-cache: false
           registry-url: https://npm.pkg.github.com
           scope: '@hideinmatrix'
+      - name: Verify owner-pushed release tag belongs to master before using secrets
+        if: github.ref_type == 'tag'
+        run: node scripts/verify-release-source.mjs
       - name: Validate manual cache warm-up request
         if: github.event_name == 'workflow_dispatch' && inputs.warm_cache
         env:
@@ -111,7 +116,7 @@ jobs:
 
   build:
     # Never spend native runner time on ordinary branch pushes.
-    if: github.event.repository.private == true && (github.event_name == 'workflow_dispatch' || github.ref_type == 'tag')
+    if: github.repository == 'HideInMatrix/micromatrix-workbench' && ((github.event.repository.private == true && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master') || (github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && github.actor == github.repository_owner))
     needs: verify
     timeout-minutes: 60
     strategy:
@@ -267,7 +272,7 @@ jobs:
 
   release:
     # Never publish a release from a manual branch build or a partial matrix.
-    if: github.event.repository.private == true && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    if: github.repository == 'HideInMatrix/micromatrix-workbench' && github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && github.actor == github.repository_owner
     needs: [verify, build]
     runs-on: ubuntu-22.04
     timeout-minutes: 10

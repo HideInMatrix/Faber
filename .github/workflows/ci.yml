@@ -26,6 +26,7 @@ jobs:
           package-manager-cache: false
       - run: node scripts/verify-source-boundary.mjs
       - run: node --test scripts/test-distribution-privacy.mjs
+      - run: node --test scripts/test-release-source.mjs
 
   check:
     # Never expose private packages or credentials to a public repository/PR.
