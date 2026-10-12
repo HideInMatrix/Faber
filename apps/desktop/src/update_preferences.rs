@@ -4,7 +4,7 @@ use tauri::{Manager, Url};
 use tauri_plugin_updater::UpdaterExt;
 
 const DEFAULT_PREFIX: &str = "https://cdn.gh-proxy.org/";
-const MANIFEST: &str = "https://github.com/HideInMatrix/micromatrix-workbench/releases/latest/download/latest.json";
+const MANIFEST: &str = "https://github.com/HideInMatrix/Faber/releases/latest/download/latest.json";
 
 #[derive(Serialize, Deserialize)]
 pub struct UpdatePreferences {
@@ -33,11 +33,39 @@ fn github_url(prefix: &str, original: &Url) -> Result<Url, String> {
     || !original.username().is_empty() || original.password().is_some()
     || original.port().is_some_and(|port| port != 443)
     || original.query().is_some() || original.fragment().is_some()
-    || !original.path().starts_with("/HideInMatrix/micromatrix-workbench/releases/") {
+    || !(original.path().starts_with("/HideInMatrix/Faber/releases/")
+      || original.path().starts_with("/HideInMatrix/micromatrix-workbench/releases/")) {
     return Err("更新资源必须来自本项目的 GitHub Release".into());
   }
   if prefix.is_empty() { return Ok(original.clone()); }
   Url::parse(&format!("{}{}", normalize_prefix(prefix)?, original.as_str())).map_err(|_| "加速 URL 无效".into())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn accepts_only_canonical_and_legacy_release_urls() {
+    for repository in ["Faber", "micromatrix-workbench"] {
+      let url = Url::parse(&format!("https://github.com/HideInMatrix/{repository}/releases/download/v1.0.2/update.exe")).unwrap();
+      assert_eq!(github_url("", &url).unwrap(), url);
+      assert_eq!(github_url(DEFAULT_PREFIX, &url).unwrap().as_str(), format!("{DEFAULT_PREFIX}{url}"));
+    }
+    for value in [
+      "http://github.com/HideInMatrix/Faber/releases/download/update.exe",
+      "https://example.com/HideInMatrix/Faber/releases/download/update.exe",
+      "https://github.com/Other/Faber/releases/download/update.exe",
+      "https://github.com/HideInMatrix/Faber-other/releases/download/update.exe",
+      "https://github.com/HideInMatrix/Faber/releases-evil/update.exe",
+      "https://user@github.com/HideInMatrix/Faber/releases/download/update.exe",
+      "https://github.com:444/HideInMatrix/Faber/releases/download/update.exe",
+      "https://github.com/HideInMatrix/Faber/releases/download/update.exe?token=x",
+      "https://github.com/HideInMatrix/Faber/releases/download/update.exe#fragment",
+    ] {
+      assert!(github_url("", &Url::parse(value).unwrap()).is_err(), "{value}");
+    }
+  }
 }
 
 fn path(app: &tauri::AppHandle) -> Result<PathBuf, String> {

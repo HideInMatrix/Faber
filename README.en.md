@@ -25,7 +25,7 @@ Opening the app only loads settings. MCP and the tunnel run only after you click
 
 ## Installation
 
-Download the **installer** for your computer from [GitHub Releases](https://github.com/HideInMatrix/micromatrix-workbench/releases/latest):
+Download the **installer** for your computer from [GitHub Releases](https://github.com/HideInMatrix/Faber/releases/latest):
 
 | Platform | Download and install |
 | --- | --- |

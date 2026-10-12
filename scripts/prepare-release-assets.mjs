@@ -4,6 +4,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { versionFromTag } from './release-version.mjs'
 import { verifyUpdaterSignature } from './verify-updater-signature.mjs'
+import { releaseDownloadRepository } from './release-download-repository.mjs'
 
 const formats = {
   'macos-arm64': ['.dmg', '.app.tar.gz'],
@@ -25,8 +26,8 @@ export function prepareReleaseAssets(input = path.resolve('build-artifacts'), ou
   if (input === output || input.startsWith(`${output}${path.sep}`)) throw new Error('Release output must not contain the input artifacts')
   const tag = options.tag ?? process.env.GITHUB_REF_NAME
   const version = versionFromTag(tag)
-  const repository = options.repository ?? process.env.GITHUB_REPOSITORY ?? 'HideInMatrix/micromatrix-workbench'
-  if (!/^[\w.-]+\/[\w.-]+$/.test(repository)) throw new Error('Invalid release repository')
+  const repository = options.repository ?? process.env.GITHUB_REPOSITORY ?? 'HideInMatrix/Faber'
+  const downloadRepository = releaseDownloadRepository(repository)
   const publicKey = options.publicKey ?? JSON.parse(readFileSync(new URL('../apps/desktop/tauri.conf.json', import.meta.url), 'utf8')).plugins.updater.pubkey
   const files = readdirSync(input, { withFileTypes: true }).filter(entry => entry.isFile()).map(entry => entry.name)
   const assets = []
@@ -52,7 +53,7 @@ export function prepareReleaseAssets(input = path.resolve('build-artifacts'), ou
       if (extension === '.app.tar.gz' || profile === 'windows-x64') {
         const signature = checked(`${asset.name}.sig`).bytes.toString('utf8').trim()
         verifyUpdaterSignature(asset.bytes, signature, publicKey, version)
-        const entry = { signature, url: `https://github.com/${repository}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(asset.name)}` }
+        const entry = { signature, url: `https://github.com/${downloadRepository}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(asset.name)}` }
         if (extension === updateExtension) platforms[target] = entry
         const installer = { '.exe': 'nsis', '.msi': 'msi', '.app.tar.gz': 'app' }[extension]
         platforms[`${target}-${installer}`] = entry

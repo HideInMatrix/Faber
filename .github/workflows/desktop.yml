@@ -38,7 +38,7 @@ jobs:
   verify:
     # Public builds require this repository's owner-pushed version tag. PRs,
     # forks, public branch pushes and public manual builds cannot use secrets.
-    if: github.repository == 'HideInMatrix/micromatrix-workbench' && ((github.event.repository.private == true && github.ref == 'refs/heads/master') || (github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && github.actor == github.repository_owner))
+    if: github.repository == 'HideInMatrix/Faber' && github.repository_id == '1335576308' && ((github.event.repository.private == true && github.ref == 'refs/heads/master') || (github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && github.actor == github.repository_owner))
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
@@ -116,7 +116,7 @@ jobs:
 
   build:
     # Never spend native runner time on ordinary branch pushes.
-    if: github.repository == 'HideInMatrix/micromatrix-workbench' && ((github.event.repository.private == true && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master') || (github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && github.actor == github.repository_owner))
+    if: github.repository == 'HideInMatrix/Faber' && github.repository_id == '1335576308' && ((github.event.repository.private == true && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master') || (github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && github.actor == github.repository_owner))
     needs: verify
     timeout-minutes: 60
     strategy:
@@ -272,7 +272,7 @@ jobs:
 
   release:
     # Never publish a release from a manual branch build or a partial matrix.
-    if: github.repository == 'HideInMatrix/micromatrix-workbench' && github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && github.actor == github.repository_owner
+    if: github.repository == 'HideInMatrix/Faber' && github.repository_id == '1335576308' && github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && github.actor == github.repository_owner
     needs: [verify, build]
     runs-on: ubuntu-22.04
     timeout-minutes: 10

@@ -7,7 +7,8 @@ import { versionFromTag } from './release-version.mjs'
 // The public repository may build only an owner-pushed SemVer tag whose exact
 // source is reachable from master. Run before any signing/package secret use.
 export function verifyReleaseSource(env = process.env, run = execFileSync) {
-  assert.equal(env.GITHUB_REPOSITORY, 'HideInMatrix/micromatrix-workbench')
+  assert.equal(env.GITHUB_REPOSITORY, 'HideInMatrix/Faber')
+  assert.equal(env.GITHUB_REPOSITORY_ID, '1335576308', 'Release must use the original repository, not a recreated name')
   assert.equal(env.GITHUB_REPOSITORY_OWNER, 'HideInMatrix')
   assert.equal(env.GITHUB_ACTOR, env.GITHUB_REPOSITORY_OWNER, 'Release push must come from the repository owner')
   assert.equal(env.GITHUB_EVENT_NAME, 'push')

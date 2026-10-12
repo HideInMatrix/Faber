@@ -36,7 +36,7 @@
     "verify:package-integration": "node scripts/test-computer-use-package-integration.mjs",
     "verify:brand": "node --test scripts/test-brand.mjs",
     "verify:network-health": "node --test scripts/test-network-health.mjs",
-    "verify:release-source": "node --test scripts/test-release-source.mjs",
+    "verify:release-source": "node --test scripts/test-release-source.mjs scripts/test-release-rename.mjs",
     "verify:i18n": "node --test scripts/test-i18n.mjs"
   },
   "dependencies": {

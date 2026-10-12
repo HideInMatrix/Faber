@@ -25,7 +25,7 @@ Faber，取自拉丁文“工匠”。让 AI 不止于对话，而是完成实�
 
 ## 安装
 
-前往 [GitHub Releases](https://github.com/HideInMatrix/micromatrix-workbench/releases/latest)，下载适合自己电脑的**安装包**：
+前往 [GitHub Releases](https://github.com/HideInMatrix/Faber/releases/latest)，下载适合自己电脑的**安装包**：
 
 | 平台 | 下载与安装 |
 | --- | --- |

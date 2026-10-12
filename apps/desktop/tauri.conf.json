@@ -63,7 +63,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI2RkQzNzIzNDdENkI4QUQKUldTdHVOWkhJemY5dHVUUWs5UHN5QVMycVExZEoySXNhSnl6cm1lYmUrSUcwVDQyYVhROWN0UlAK",
       "endpoints": [
-        "https://github.com/HideInMatrix/micromatrix-workbench/releases/latest/download/latest.json"
+        "https://github.com/HideInMatrix/Faber/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "quiet"
