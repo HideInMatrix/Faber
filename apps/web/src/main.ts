@@ -3,6 +3,9 @@ import App from './App.vue'
 import { router } from './router'
 import 'virtual:uno.css'
 import './styles.css'
+import { initializeLocale } from './composables/useLocale'
+
+initializeLocale()
 
 const systemColorScheme = window.matchMedia('(prefers-color-scheme: dark)')
 const syncSystemColorScheme = () => {

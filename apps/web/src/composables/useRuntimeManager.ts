@@ -1,3 +1,4 @@
+import { t } from './useLocale'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { updateInstallationLocked } from './useAppUpdater'
@@ -44,7 +45,7 @@ export function useRuntimeManager() {
     if (sequence !== lifecycleSequence || runtime.value !== previous) return
     runtime.value = updated
     if (previous?.stopping && !updated.stopping && !updated.running && lifecycleAction.value !== 'stop') {
-      toast.success('Runtime 已停止。')
+      toast.success(t("Runtime 已停止。"))
     }
     if (wasRunning && !updated.running && updated.exit_reason && lifecycleAction.value !== 'stop') {
       toast.error(updated.exit_reason, { id: 'runtime-unexpected-exit' })
@@ -62,8 +63,8 @@ export function useRuntimeManager() {
   }
 
   function validateDraft(value: Pick<RuntimeDraft, 'name' | 'workspace'>) {
-    if (!value.name) throw new Error('Runtime 名称不能为空。')
-    if (!value.workspace) throw new Error('Runtime 必须选择工作目录。')
+    if (!value.name) throw new Error(t("Runtime 名称不能为空。"))
+    if (!value.workspace) throw new Error(t("Runtime 必须选择工作目录。"))
   }
 
   async function persistDraft(): Promise<RuntimeDto> {
@@ -80,7 +81,7 @@ export function useRuntimeManager() {
     busy.value = true
     try {
       await persistDraft()
-      toast.success('Runtime 配置已保存。')
+      toast.success(t("Runtime 配置已保存。"))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error))
     } finally {
@@ -108,7 +109,7 @@ export function useRuntimeManager() {
       if (sequence !== lifecycleSequence) return
       runtime.value = updated
       if (runtime.value) draft.value = runtimeDraft(runtime.value, draft.value)
-      toast.success(runtime.value?.running ? 'Runtime 已启动。' : 'Runtime 已停止。')
+      toast.success(runtime.value?.running ? t("Runtime 已启动。") : t("Runtime 已停止。"))
     } catch (error) {
       if (sequence !== lifecycleSequence) return
       if (stopping) {
@@ -125,17 +126,17 @@ export function useRuntimeManager() {
           if (sequence !== lifecycleSequence) return
           if (confirmed && !confirmed.running && !confirmed.stopping) {
             draft.value = runtimeDraft(confirmed, draft.value)
-            toast.success('Runtime 已停止。')
+            toast.success(t("Runtime 已停止。"))
             return
           }
           if (confirmed?.stopping) {
-            toast.info('Runtime 仍在停止并清理连接；继续读取状态，请勿重复启停。')
+            toast.info(t("Runtime 仍在停止并清理连接；继续读取状态，请勿重复启停。"))
             return
           }
         } catch { /* Report the original failure if state cannot be confirmed. */ }
       }
       toast.error(error instanceof Error && error.name === 'TimeoutError'
-        ? '本机启停请求超时，结果尚未确认；正在重新读取状态。'
+        ? t("本机启停请求超时，结果尚未确认；正在重新读取状态。")
         : error instanceof Error ? error.message : String(error))
       // Aborting fetch alone does not cancel the server's startup transaction.
       if (!stopping) {
@@ -155,7 +156,7 @@ export function useRuntimeManager() {
     if (!value) return
     try {
       await navigator.clipboard.writeText(value)
-      toast.success('MCP 地址已复制。')
+      toast.success(t("MCP 地址已复制。"))
       copiedUrl.value = value
       window.setTimeout(() => {
         if (copiedUrl.value === value) copiedUrl.value = ''
@@ -192,7 +193,7 @@ export function useRuntimeManager() {
           const secrets = await desktopApi.savedRuntimeSecrets()
           if (secrets) draft.value = restoreSavedSecrets(draft.value, secrets)
         } catch {
-          toast.error('已保存的密钥未能回填；现有服务密钥仍保留，可重新输入。', { id: 'secret-restore' })
+          toast.error(t("已保存的密钥未能回填；现有服务密钥仍保留，可重新输入。"), { id: 'secret-restore' })
         }
         ready.value = true
         initializationErrorShown = false

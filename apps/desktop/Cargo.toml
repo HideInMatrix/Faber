@@ -1,6 +1,6 @@
 [package]
 name = "micromatrix-pi-mcp"
-version = "1.0.1"
+version = "1.0.2"
 description = "Desktop control surface for the Faber Runtime runtime"
 authors = ["MicroMatrix"]
 repository = ""

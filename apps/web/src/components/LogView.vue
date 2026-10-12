@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from '../composables/useLocale'
+
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { Trash2 } from '@lucide/vue'
@@ -31,7 +33,7 @@ async function clearLogs() {
   try {
     cursor = await desktopApi.clearLogs()
     logs.value = []
-    toast.success('运行日志已清除。')
+    toast.success(t("运行日志已清除。"))
   } catch (error) {
     toast.error(error instanceof Error ? error.message : String(error))
   } finally {
@@ -51,8 +53,8 @@ onBeforeUnmount(() => window.clearInterval(pollTimer))
   <section class="grid w-full gap-5">
     <header class="flex min-h-8 items-center justify-between gap-4">
       <div>
-        <h1 class="m-0 text-xl leading-7 font-medium tracking-[-0.02em]">运行日志</h1>
-        <p class="mt-[3px] mb-0 text-xs leading-[18px] text-muted-foreground">查看 MCP Server 与网络提供商的实时运行输出。</p>
+        <h1 class="m-0 text-xl leading-7 font-medium tracking-[-0.02em]">{{ t("运行日志") }}</h1>
+        <p class="mt-[3px] mb-0 text-xs leading-[18px] text-muted-foreground">{{ t("查看 MCP Server 与网络提供商的实时运行输出。") }}</p>
       </div>
       <Button
         variant="outline"
@@ -62,7 +64,7 @@ onBeforeUnmount(() => window.clearInterval(pollTimer))
         @click="clearLogs"
       >
         <Trash2 :size="14" />
-        {{ clearing ? '清除中…' : '清除日志' }}
+        {{ clearing ? t("清除中…") : t("清除日志") }}
       </Button>
     </header>
 

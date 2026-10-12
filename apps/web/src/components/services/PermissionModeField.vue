@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from '../../composables/useLocale'
+
 import { FormField } from '@/components/ui/form'
 import type { RuntimeDraft } from '../../types'
 
@@ -34,12 +36,12 @@ const descriptions: Record<RuntimeDraft['permission_mode'], string> = {
 </script>
 
 <template>
-  <FormField label="权限模式">
+  <FormField :label="t('权限模式')">
     <select v-model="mode" :disabled="disabled">
       <option v-for="option in options" :key="option.value" :value="option.value">
-        {{ option.label }}
+        {{ t(option.label) }}
       </option>
     </select>
-    <p class="mt-1.5 mb-0 text-xs leading-5 text-muted-foreground">{{ descriptions[mode] }}</p>
+    <p class="mt-1.5 mb-0 text-xs leading-5 text-muted-foreground">{{ t(descriptions[mode]) }}</p>
   </FormField>
 </template>

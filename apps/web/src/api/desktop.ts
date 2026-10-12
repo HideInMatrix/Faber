@@ -1,3 +1,4 @@
+import { t } from '../composables/useLocale'
 import { getVersion } from '@tauri-apps/api/app'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
@@ -38,8 +39,8 @@ async function waitForDesktopControl() {
       diagnostic: () => invoke<string | null>('desktop_service_error'),
       probe: async () => {
         const response = await fetch(`${controlUrl}/healthz`, { signal: AbortSignal.timeout(1000) })
-        if (!response.ok) throw new Error(`控制服务健康检查失败：HTTP ${response.status}`)
-        if ((await response.json()).ok !== true) throw new Error('控制服务健康检查返回了无效响应')
+        if (!response.ok) throw new Error(t("控制服务健康检查失败：HTTP {value0}", { value0: response.status }))
+        if ((await response.json()).ok !== true) throw new Error(t("控制服务健康检查返回了无效响应"))
         return true
       },
       delay: () => new Promise(resolve => window.setTimeout(resolve, 150)),
@@ -117,7 +118,7 @@ export const desktopApi = {
   setComputerUseEnabled: (enabled: boolean) => call<ComputerUseStatusDto>('set_computer_use_enabled', enabled),
   checkComputerUsePermissions: (request = false) => call<ComputerUseStatusDto>('check_computer_use_permissions', request),
   async openComputerUseSettings(): Promise<void> {
-    if (!isTauri()) throw new Error('请在桌面客户端打开系统权限设置，或手动前往系统设置 → 隐私与安全性 → 辅助功能。')
+    if (!isTauri()) throw new Error(t("请在桌面客户端打开系统权限设置，或手动前往系统设置 → 隐私与安全性 → 辅助功能。"))
     await invoke('open_computer_use_settings')
   },
   configurePiExtensions: (configuration: PiExtensionConfigurationDto) => call<boolean>('configure_pi_extensions', configuration),
@@ -133,7 +134,7 @@ export const desktopApi = {
   editPiSkill: (id: string, document: string, revision: string) => call<boolean>('edit_pi_skill_document', id, document, revision),
   async openAuthorizationUrl(url: string): Promise<void> {
     if (isTauri()) await invoke('open_authorization_url', { url })
-    else if (!window.open(url, '_blank', 'noopener,noreferrer')) throw new Error('浏览器拦截了授权窗口，请允许弹窗后重试。')
+    else if (!window.open(url, '_blank', 'noopener,noreferrer')) throw new Error(t("浏览器拦截了授权窗口，请允许弹窗后重试。"))
   },
   logs: (after = 0) => call<{ cursor: number; entries: LogEntryDto[] }>('get_logs', after),
   clearLogs: () => call<number>('clear_logs'),

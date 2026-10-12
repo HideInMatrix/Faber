@@ -1,3 +1,4 @@
+import { t } from './useLocale'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { desktopApi } from '@/api/desktop'
@@ -10,7 +11,7 @@ const PERMISSION_LABELS: Record<string, string> = {
 }
 
 function permissionLabel(permission: string) {
-  return PERMISSION_LABELS[permission] || permission
+  return t(PERMISSION_LABELS[permission] || permission)
 }
 
 function stringifyPermissionArguments(request: PermissionRequestDto | null) {
@@ -53,14 +54,14 @@ function createPermissionActions(state: ReturnType<typeof createPermissionState>
       if (requestId && requestId !== notifiedRequestId) {
         notifiedRequestId = requestId
         try { await desktopApi.showPermissionPrompt() } catch {
-          toast.error('有工具请求等待批准，但窗口提醒失败；请在当前弹窗确认。', { id: 'permission-attention' })
+          toast.error(t("有工具请求等待批准，但窗口提醒失败；请在当前弹窗确认。"), { id: 'permission-attention' })
         }
       }
       if (!requestId) notifiedRequestId = ''
     } catch (error) {
       failures += 1
       if (surfaceError || (wasReachable && failures === 3)) {
-        toast.error(`审批连接失败，工具可能正在等待批准：${error instanceof Error ? error.message : String(error)}`, { id: 'permission-refresh', duration: Infinity })
+        toast.error(t("审批连接失败，工具可能正在等待批准：{value0}", { value0: error instanceof Error ? error.message : String(error) }), { id: 'permission-refresh', duration: Infinity })
       }
     } finally {
       refreshing = false
@@ -74,7 +75,7 @@ function createPermissionActions(state: ReturnType<typeof createPermissionState>
     permissionResponding.value = true
     try {
       const accepted = await desktopApi.respondPermissionRequest(request.request_id, decision)
-      if (!accepted) toast.error('授权请求已过期或不再有效。')
+      if (!accepted) toast.error(t("授权请求已过期或不再有效。"))
       await refreshPermissionRequests(false)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error))

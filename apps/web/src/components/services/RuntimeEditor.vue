@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from '../../composables/useLocale'
+
 import { computed } from 'vue'
 import { Check, Copy, Eye, EyeOff, FolderOpen, Play, RotateCcw, Square, Trash2 } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
@@ -69,41 +71,41 @@ const emit = defineEmits<{
 
 <template>
   <section class="overflow-hidden rounded-lg border border-border bg-popover p-4 shadow-sm">
-    <h2 class="mb-4 text-sm font-medium">Runtime 设置</h2>
+    <h2 class="mb-4 text-sm font-medium">{{ t("Runtime 设置") }}</h2>
 
     <FormGrid>
-      <FormField label="Runtime 名称" span="2">
-        <input v-model.trim="draft.name" :disabled="locked" placeholder="例如：Faber Runtime" />
+      <FormField :label="t('Runtime 名称')" span="2">
+        <input v-model.trim="draft.name" :disabled="locked" :placeholder="t('例如：Faber Runtime')" />
       </FormField>
-      <FormField label="本地端口">
+      <FormField :label="t('本地端口')">
         <input v-model.number="draft.port" :disabled="locked" type="number" min="1" max="65535" />
       </FormField>
-      <FormField label="监听地址"><input v-model.trim="draft.host" disabled /></FormField>
+      <FormField :label="t('监听地址')"><input v-model.trim="draft.host" disabled /></FormField>
 
-      <FormField label="公网域名" span="2">
+      <FormField :label="t('公网域名')" span="2">
         <input
           v-model.trim="draft.network.public_url"
           :disabled="locked || selectedProvider?.supports_public_url === false"
-          placeholder="例如 https://mcp.example.com"
+          :placeholder="t('例如 https://mcp.example.com')"
         />
       </FormField>
 
-      <FormField label="工作目录" span="2">
+      <FormField :label="t('工作目录')" span="2">
         <InputGroup>
           <InputGroupInput v-model="draft.workspace" :disabled="locked" />
           <InputGroupButton
             :disabled="locked"
-            aria-label="选择 Runtime 工作目录"
-            title="选择 Runtime 工作目录"
+            :aria-label="t('选择 Runtime 工作目录')"
+            :title="t('选择 Runtime 工作目录')"
             @click="emit('chooseWorkspace')"
           ><FolderOpen :size="15" /></InputGroupButton>
         </InputGroup>
       </FormField>
 
-      <FormField label="网络方案" span="2">
+      <FormField :label="t('网络方案')" span="2">
         <select v-model="draft.network.provider" :disabled="locked">
           <option v-for="provider in networkProviders" :key="provider.key" :value="provider.key">
-            {{ provider.label }}
+            {{ t(provider.label) }}
           </option>
         </select>
       </FormField>
@@ -111,7 +113,7 @@ const emit = defineEmits<{
       <FormField
         v-for="field in selectedProvider?.options || []"
         :key="field.key"
-        :label="field.label"
+        :label="t(field.label)"
         :span="field.span"
       >
         <div v-if="field.secret" class="grid gap-1.5">
@@ -121,19 +123,19 @@ const emit = defineEmits<{
               :disabled="locked || draft.network.secret_actions[field.key] === 'clear'"
               :type="tunnelTokenVisible ? 'text' : 'password'"
               autocomplete="new-password"
-              placeholder="留空则保留现有值"
+              :placeholder="t('留空则保留现有值')"
               @update:model-value="updateNetworkSecret(field.key, $event)"
             />
             <InputGroupButton
-              :aria-label="tunnelTokenVisible ? '隐藏网络密钥' : '显示网络密钥'"
+              :aria-label="tunnelTokenVisible ? t('隐藏网络密钥') : t('显示网络密钥')"
               :aria-pressed="tunnelTokenVisible"
-              :title="tunnelTokenVisible ? '隐藏网络密钥' : '显示网络密钥'"
+              :title="tunnelTokenVisible ? t('隐藏网络密钥') : t('显示网络密钥')"
               @click="tunnelTokenVisible = !tunnelTokenVisible"
             ><EyeOff v-if="tunnelTokenVisible" :size="15" /><Eye v-else :size="15" /></InputGroupButton>
             <InputGroupButton
               :disabled="locked || (!secretConfigured(field.key) && !draft.network.options[field.key])"
-              :aria-label="draft.network.secret_actions[field.key] === 'clear' ? '撤销清除网络密钥' : '清除网络密钥'"
-              :title="draft.network.secret_actions[field.key] === 'clear' ? '撤销清除' : '保存时清除'"
+              :aria-label="draft.network.secret_actions[field.key] === 'clear' ? t('撤销清除网络密钥') : t('清除网络密钥')"
+              :title="draft.network.secret_actions[field.key] === 'clear' ? t('撤销清除') : t('保存时清除')"
               @click="toggleNetworkSecretClear(field.key)"
             ><RotateCcw v-if="draft.network.secret_actions[field.key] === 'clear'" :size="15" /><Trash2 v-else :size="15" /></InputGroupButton>
           </InputGroup>
@@ -145,7 +147,7 @@ const emit = defineEmits<{
           @change="updateNetworkChoice(field.key, $event)"
         >
           <option v-for="choice in field.choices" :key="choice.value" :value="choice.value">
-            {{ choice.label }}
+            {{ t(choice.label) }}
           </option>
         </select>
         <input
@@ -156,12 +158,12 @@ const emit = defineEmits<{
           autocomplete="off"
         />
         <details v-if="field.description" class="text-xs font-normal text-muted-foreground">
-          <summary class="cursor-pointer">配置说明</summary>
-          <p class="mt-1 leading-5">{{ field.description }}</p>
+          <summary class="cursor-pointer">{{ t("配置说明") }}</summary>
+          <p class="mt-1 leading-5">{{ t(field.description) }}</p>
         </details>
       </FormField>
 
-      <FormField label="OAuth 密码">
+      <FormField :label="t('OAuth 密码')">
         <div class="grid gap-1.5">
           <InputGroup>
             <InputGroupInput
@@ -169,19 +171,19 @@ const emit = defineEmits<{
               :disabled="locked || draft.oauth_password_action === 'clear'"
               :type="oauthPasswordVisible ? 'text' : 'password'"
               autocomplete="new-password"
-              placeholder="留空则保留现有值"
+              :placeholder="t('留空则保留现有值')"
               @update:model-value="updateOAuthPassword"
             />
             <InputGroupButton
-              :aria-label="oauthPasswordVisible ? '隐藏 OAuth 密码' : '显示 OAuth 密码'"
+              :aria-label="oauthPasswordVisible ? t('隐藏 OAuth 密码') : t('显示 OAuth 密码')"
               :aria-pressed="oauthPasswordVisible"
-              :title="oauthPasswordVisible ? '隐藏 OAuth 密码' : '显示 OAuth 密码'"
+              :title="oauthPasswordVisible ? t('隐藏 OAuth 密码') : t('显示 OAuth 密码')"
               @click="emit('toggleOAuthPassword')"
             ><EyeOff v-if="oauthPasswordVisible" :size="15" /><Eye v-else :size="15" /></InputGroupButton>
             <InputGroupButton
               :disabled="locked || (!draft.oauth_password_configured && !draft.oauth_password)"
-              :aria-label="draft.oauth_password_action === 'clear' ? '撤销清除 OAuth 密码' : '清除 OAuth 密码'"
-              :title="draft.oauth_password_action === 'clear' ? '撤销清除' : '保存时清除'"
+              :aria-label="draft.oauth_password_action === 'clear' ? t('撤销清除 OAuth 密码') : t('清除 OAuth 密码')"
+              :title="draft.oauth_password_action === 'clear' ? t('撤销清除') : t('保存时清除')"
               @click="toggleOAuthPasswordClear"
             ><RotateCcw v-if="draft.oauth_password_action === 'clear'" :size="15" /><Trash2 v-else :size="15" /></InputGroupButton>
           </InputGroup>
@@ -190,7 +192,7 @@ const emit = defineEmits<{
 
       <PermissionModeField v-model="draft.permission_mode" :disabled="locked" />
 
-      <CheckField span="2"><input v-model="draft.remember_secrets" type="checkbox" /><span>在本机保存网络令牌与 OAuth 密码</span></CheckField>
+      <CheckField span="2"><input v-model="draft.remember_secrets" type="checkbox" /><span>{{ t("在本机保存网络令牌与 OAuth 密码") }}</span></CheckField>
     </FormGrid>
 
     <div v-if="runtimeUrl" class="mt-4 flex items-center gap-2 rounded-md border border-border bg-secondary/50 px-3 py-[9px]">
@@ -210,10 +212,10 @@ const emit = defineEmits<{
         >
           <Square v-if="selectedRunning || lifecycleAction === 'start'" :size="13" />
           <Play v-else :size="13" />
-          {{ lifecycleAction === 'stop' ? '停止中…' : lifecycleAction === 'start' ? '取消启动' : selectedRunning ? '停止' : '启动' }}
+          {{ lifecycleAction === 'stop' ? t("停止中…") : lifecycleAction === 'start' ? t("取消启动") : selectedRunning ? t("停止") : t("启动") }}
         </Button>
         <Button variant="outline" size="sm" :disabled="busy || lifecycleBusy || locked" @click="emit('save')">
-          保存
+          {{ t("保存") }}
         </Button>
       </div>
     </div>

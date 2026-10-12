@@ -1,3 +1,4 @@
+import { t } from '../composables/useLocale'
 export async function waitForControlService(options: {
   probe: () => Promise<boolean>
   diagnostic: () => Promise<string | null>
@@ -19,5 +20,5 @@ export async function waitForControlService(options: {
     }
     await options.delay()
   }
-  throw new Error(`本地控制服务未就绪，Runtime 和 Tunnel 尚未启动。请检查桌面服务状态后重试。${lastError ? `\n${lastError}` : ''}`)
+  throw new Error(t("本地控制服务未就绪，Runtime 和 Tunnel 尚未启动。请检查桌面服务状态后重试。{value0}", { value0: lastError ? `\n${lastError}` : '' }))
 }

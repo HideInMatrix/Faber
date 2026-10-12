@@ -1,3 +1,4 @@
+import { t } from './useLocale'
 import { computed, reactive, ref } from 'vue'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { Update } from '@tauri-apps/plugin-updater'
@@ -44,7 +45,7 @@ async function check() {
   await controller.check()
   if (state.phase === 'available' && state.version !== announcedVersion) {
     announcedVersion = state.version
-    toast.info(`发现新版本 ${state.version}，可在“关于”中手动更新。`)
+    toast.info(t("发现新版本 {value0}，可在“关于”中手动更新。", { value0: state.version }))
   }
 }
 async function savePrefix() {
@@ -56,7 +57,7 @@ async function savePrefix() {
     const settings = await invoke<UpdatePreferences>('save_update_preferences', { prefix: requestedPrefix })
     downloadPrefix.value = prefixDraft.value = settings.download_proxy_prefix
     await controller.reset() // Recheck explicitly before obtaining a new download resource.
-    toast.success('下载加速前缀已保存。')
+    toast.success(t("下载加速前缀已保存。"))
   } catch (error) { state.error = error instanceof Error ? error.message : String(error) }
   finally { savingPrefix.value = false }
 }

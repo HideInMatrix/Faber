@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from '../../composables/useLocale'
+
 import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
@@ -26,7 +28,7 @@ function loadBrowser() {
 const granted = computed(() => status.value?.platform === 'macos'
   ? status.value.permission?.accessibility === true : status.value?.permission?.interactiveDesktop === true)
 const locked = computed(() => busy.value || props.locked || status.value?.running || updateInstallationLocked.value)
-const permissionLabel = computed(() => computerPermissionLabel(status.value, loadingError.value))
+const permissionLabel = computed(() => t(computerPermissionLabel(status.value, loadingError.value)))
 
 async function refresh() {
   status.value = await desktopApi.computerUseStatus()
@@ -72,12 +74,12 @@ async function saveBrowser(clear = false) {
     browserError.value = ''
     const endpoint = browserEndpoint.value.trim()
     const allowedOrigins = [...new Set(browserOrigins.value.split(/\r?\n/).map(value => value.trim()).filter(Boolean))]
-    if (!clear && (!endpoint || !allowedOrigins.length)) throw new Error('填写本地连接地址和至少一个允许的网站')
+    if (!clear && (!endpoint || !allowedOrigins.length)) throw new Error(t("填写本地连接地址和至少一个允许的网站"))
     status.value = await desktopApi.configureComputerUseBrowser(clear ? null : {endpoint, allowedOrigins})
     browserDirty.value = false
     loadBrowser()
     emit('changed')
-    toast.success(clear ? '已关闭浏览器通道' : '浏览器配置已保存')
+    toast.success(clear ? t("已关闭浏览器通道") : t("浏览器配置已保存"))
   }, true)
 }
 // Mount reads cached metadata only. Permission checks are explicit, not timers
@@ -87,46 +89,46 @@ defineExpose({ refresh: () => action(refresh) })
 </script>
 
 <template>
-  <section class="rounded-xl border border-border bg-card p-4" aria-label="内置 Computer Use">
+  <section class="rounded-xl border border-border bg-card p-4" :aria-label="t('内置 Computer Use')">
     <div class="flex items-center justify-between gap-4">
       <div class="flex min-w-0 flex-wrap items-center gap-2">
         <h2 class="m-0 text-sm font-medium">Computer Use</h2>
         <span v-if="status?.enabled" role="status" class="rounded-md bg-secondary px-2 py-0.5 text-xs text-muted-foreground">{{ permissionLabel }}</span>
-        <span v-if="status?.enabled && !status.allowActions" class="text-xs text-muted-foreground">旧配置只读</span>
+        <span v-if="status?.enabled && !status.allowActions" class="text-xs text-muted-foreground">{{ t("旧配置只读") }}</span>
       </div>
       <Switch :model-value="status?.enabled ?? false" :disabled="locked || !status || (!status.enabled && (!status.supported || !status.available || status.conflict))"
-        :title="status?.running ? '停止 Runtime 后可修改' : '启用电脑控制工具'" aria-label="启用内置 Computer Use" @update:model-value="toggle" />
+        :title="status?.running ? t('停止 Runtime 后可修改') : t('启用电脑控制工具')" :aria-label="t('启用内置 Computer Use')" @update:model-value="toggle" />
     </div>
-    <p v-if="!status" class="mt-3 text-xs text-muted-foreground">{{ loadingError || '正在读取配置…' }}</p>
-    <p v-else-if="!status.supported || !status.available || status.conflict" role="alert" class="mt-3 text-xs text-destructive">{{ status.conflict ? 'computer_use ID 已被占用，请先为外部 MCP 改名。' : '原生 helper 缺失或系统不支持，请安装完整的桌面包。' }}</p>
+    <p v-if="!status" class="mt-3 text-xs text-muted-foreground">{{ loadingError || t("正在读取配置…") }}</p>
+    <p v-else-if="!status.supported || !status.available || status.conflict" role="alert" class="mt-3 text-xs text-destructive">{{ status.conflict ? t("computer_use ID 已被占用，请先为外部 MCP 改名。") : t("原生 helper 缺失或系统不支持，请安装完整的桌面包。") }}</p>
     <div v-else-if="status.enabled" class="mt-3 space-y-3">
       <template v-if="status.platform === 'macos'">
         <div class="flex flex-wrap gap-2">
-          <Button v-if="!granted || status.permission?.screenRecording !== true" size="sm" :variant="granted ? 'outline' : 'default'" :disabled="busy || !status.allowActions || updateInstallationLocked" @click="requestPermission">设置权限</Button>
-          <Button size="sm" variant="outline" :disabled="busy || updateInstallationLocked" @click="action(() => check(false))">重新检测</Button>
+          <Button v-if="!granted || status.permission?.screenRecording !== true" size="sm" :variant="granted ? 'outline' : 'default'" :disabled="busy || !status.allowActions || updateInstallationLocked" @click="requestPermission">{{ t("设置权限") }}</Button>
+          <Button size="sm" variant="outline" :disabled="busy || updateInstallationLocked" @click="action(() => check(false))">{{ t("重新检测") }}</Button>
         </div>
       </template>
       <template v-else>
-        <Button size="sm" variant="outline" :disabled="busy || updateInstallationLocked" @click="action(() => check(false))">重新检测</Button>
+        <Button size="sm" variant="outline" :disabled="busy || updateInstallationLocked" @click="action(() => check(false))">{{ t("重新检测") }}</Button>
       </template>
-      <Button v-if="!status.allowActions" size="sm" variant="outline" :disabled="locked" @click="toggle(true)">启用控制动作（保留本机审批）</Button>
+      <Button v-if="!status.allowActions" size="sm" variant="outline" :disabled="locked" @click="toggle(true)">{{ t("启用控制动作（保留本机审批）") }}</Button>
       <p v-if="loadingError || status.error" role="alert" class="whitespace-pre-wrap text-xs text-destructive">{{ loadingError || status.error }}</p>
     </div>
     <!-- Browser configuration is platform-independent; native support still gates desktop activation above. -->
     <details v-if="status" class="mt-4 border-t border-border pt-3">
-      <summary class="cursor-pointer text-sm">浏览器连接<span v-if="status.browser" class="ml-2 text-xs text-muted-foreground">已配置</span></summary>
+      <summary class="cursor-pointer text-sm">{{ t("浏览器连接") }}<span v-if="status.browser" class="ml-2 text-xs text-muted-foreground">{{ t("已配置") }}</span></summary>
       <fieldset :disabled="locked" class="mt-3 space-y-3">
-        <FormField label="本地浏览器连接地址">
-          <input id="computer-browser-endpoint" aria-label="本地浏览器连接地址" v-model="browserEndpoint" placeholder="ws://127.0.0.1:9222/devtools/browser/…" @input="browserDirty = true" />
+        <FormField :label="t('本地浏览器连接地址')">
+          <input id="computer-browser-endpoint" :aria-label="t('本地浏览器连接地址')" v-model="browserEndpoint" placeholder="ws://127.0.0.1:9222/devtools/browser/…" @input="browserDirty = true" />
         </FormField>
-        <FormField label="允许的网站（每行一个）">
-          <textarea id="computer-browser-origins" aria-label="允许的网站" v-model="browserOrigins" :rows="3" placeholder="https://example.com" @input="browserDirty = true" />
+        <FormField :label="t('允许的网站（每行一个）')">
+          <textarea id="computer-browser-origins" :aria-label="t('允许的网站')" v-model="browserOrigins" :rows="3" placeholder="https://example.com" @input="browserDirty = true" />
         </FormField>
-        <p class="text-xs text-muted-foreground">仅连接已开启调试的独立 Chromium 浏览器；保存不启动浏览器或 Runtime。</p>
-        <p v-if="browserError" role="alert" aria-label="浏览器配置错误" class="whitespace-pre-wrap text-xs text-destructive">{{ browserError }}</p>
+        <p class="text-xs text-muted-foreground">{{ t("仅连接已开启调试的独立 Chromium 浏览器；保存不启动浏览器或 Runtime。") }}</p>
+        <p v-if="browserError" role="alert" :aria-label="t('浏览器配置错误')" class="whitespace-pre-wrap text-xs text-destructive">{{ browserError }}</p>
         <div class="flex gap-2">
-          <Button size="sm" :disabled="locked || !browserDirty" @click="saveBrowser()">保存</Button>
-          <Button size="sm" variant="outline" :disabled="locked || !status?.browser" @click="saveBrowser(true)">关闭通道</Button>
+          <Button size="sm" :disabled="locked || !browserDirty" @click="saveBrowser()">{{ t("保存") }}</Button>
+          <Button size="sm" variant="outline" :disabled="locked || !status?.browser" @click="saveBrowser(true)">{{ t("关闭通道") }}</Button>
         </div>
       </fieldset>
     </details>
