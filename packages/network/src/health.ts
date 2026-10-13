@@ -26,7 +26,7 @@ async function abortable<T>(operation: () => Promise<T>, signal: AbortSignal): P
  * are sent. Redirects and unbounded bodies are refused. */
 export async function probePublicService(base: string, instanceId: string, signal?: AbortSignal): Promise<void> {
   try {
-    const abort = AbortSignal.timeout(3000);
+    const abort = AbortSignal.timeout(10000);
     const bounded = signal ? AbortSignal.any([signal, abort]) : abort;
     await abortable(async () => {
       const response = await fetch(`${base}/healthz`, { redirect: "error", headers: { "ngrok-skip-browser-warning": "1" }, signal: bounded });
@@ -64,7 +64,7 @@ export async function probePublicService(base: string, instanceId: string, signa
   } catch (error) {
     if (signal?.aborted) throw signal.reason;
     if (error instanceof PublicRouteError) throw error;
-    if (error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name)) throw new PublicRouteError("timeout", "Public health check timed out after 3 seconds");
+    if (error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name)) throw new PublicRouteError("timeout", "Public health check timed out after 10 seconds");
     const cause = error instanceof Error ? error.cause as { code?: unknown } | undefined : undefined;
     const code = typeof cause?.code === "string" && /^[A-Z0-9_]{1,64}$/.test(cause.code) ? ` (${cause.code})` : "";
     throw new PublicRouteError("network_error", `Public health connection failed${code}`);
@@ -89,7 +89,7 @@ export interface NetworkHealthMonitorOptions {
 export class NetworkHealthMonitor {
   #controller = new AbortController();
   #work: Promise<void> | undefined;
-  constructor(readonly probe: (signal: AbortSignal) => Promise<void>, readonly failed: (error: Error) => void, readonly intervalMs = 15000, readonly options: NetworkHealthMonitorOptions = {}) {}
+  constructor(readonly probe: (signal: AbortSignal) => Promise<void>, readonly failed: (error: Error) => void, readonly intervalMs = 30000, readonly options: NetworkHealthMonitorOptions = {}) {}
   start(): void {
     if (this.#work) throw new Error("Health monitor already started");
     this.#work = this.#run();

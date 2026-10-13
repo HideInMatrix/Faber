@@ -120,12 +120,22 @@ test('Stop interrupts reading a response whose body has stalled', async t => {
   assert.equal(body.locked, false)
 })
 
-test('Three-second probe deadline is effective even when fetch ignores abort', async t => {
+test('Ten-second probe deadline is effective even when fetch ignores abort', async t => {
   const pending = deferred(), original = globalThis.fetch
   t.after(() => { globalThis.fetch = original; pending.resolve(new Response()) })
   globalThis.fetch = () => pending.promise
-  await assert.rejects(bounded(probePublicService('https://health.invalid', 'owned'), 4500),
-    error => error instanceof PublicRouteError && error.code === 'timeout')
+  await assert.rejects(bounded(probePublicService('https://health.invalid', 'owned'), 11500),
+    error => error instanceof PublicRouteError && error.code === 'timeout' && error.message.includes('10 seconds'))
+})
+
+test('A healthy public route responding after four seconds still passes', async t => {
+  const original = globalThis.fetch
+  t.after(() => { globalThis.fetch = original })
+  globalThis.fetch = async () => {
+    await delay(4000)
+    return Response.json({ ok: true, instance_id: 'owned' })
+  }
+  await bounded(probePublicService('https://health.invalid', 'owned'), 5500)
 })
 
 test('Bad HTTP response does not wait for a stalled body cancellation', async t => {

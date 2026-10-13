@@ -243,7 +243,7 @@ export class RuntimeSupervisor implements RuntimeControl {
         if (startingFailure) throw startingFailure;
         startup.signal.throwIfAborted();
         const publicBaseUrl = this.#network.publicBaseUrl;
-        this.#networkHealth = new NetworkHealthMonitor(signal => probePublicService(publicBaseUrl, service.instanceId, signal), () => {}, 15000, {
+        this.#networkHealth = new NetworkHealthMonitor(signal => probePublicService(publicBaseUrl, service.instanceId, signal), () => {}, 30000, {
           keepRunningOnFailure: true,
           onProbeResult: ({ ok, failures, error }) => {
             if (!this.#running) return;
