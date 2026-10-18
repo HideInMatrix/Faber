@@ -1943,7 +1943,7 @@ dependencies = [
 
 [[package]]
 name = "micromatrix-pi-mcp"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "log",
  "open",
