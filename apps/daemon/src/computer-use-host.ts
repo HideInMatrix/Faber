@@ -2,6 +2,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isSea } from "node:sea";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { computerUseBrowserDataDirectory } from "./computer-use-browser.js";
 import {
   BrowserAdapter, ComputerUseRuntime, DesktopProxy, JsonDocumentAdapter,
   RemoteDesktopAdapter, VisualDesktopAdapter, createComputerUseServer,
@@ -44,7 +45,8 @@ export async function startHostedComputerUseMcp(options: {
     runtime = new ComputerUseRuntime([
       desktop, new RemoteDesktopAdapter(desktop), new VisualDesktopAdapter(desktop),
       new JsonDocumentAdapter(options.workspace),
-      ...(options.browser ? [new BrowserAdapter(options.browser)] : []), ...installed,
+      ...(options.browser ? [new BrowserAdapter(options.browser, options.browser.mode === "managed"
+        ? { dataDirectory: computerUseBrowserDataDirectory(options.workspace) } : {})] : []), ...installed,
     ], options.allowActions);
   } catch (error) {
     await Promise.all(installed.map(provider => provider.close()));

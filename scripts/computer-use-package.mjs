@@ -12,7 +12,7 @@ if (realpathSync(computerUsePackageRoot) !== path.resolve(computerUsePackageRoot
 }
 export const computerUseRequire = createRequire(path.join(computerUsePackageRoot, 'package.json'))
 const computerUsePackage = JSON.parse(readFileSync(path.join(computerUsePackageRoot, 'package.json'), 'utf8'))
-if (computerUsePackage.name !== '@hideinmatrix/computer-use' || computerUsePackage.version !== '0.1.3'
+if (computerUsePackage.name !== '@hideinmatrix/computer-use' || computerUsePackage.version !== '0.2.0'
   || computerUsePackage.repository?.url !== 'git+https://github.com/HideInMatrix/computer-use.git') {
   throw new Error('Unexpected Computer Use package; review native/API/resource contracts before upgrading')
 }

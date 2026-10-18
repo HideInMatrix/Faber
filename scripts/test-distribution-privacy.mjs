@@ -10,7 +10,7 @@ function fixture(fn) {
   try { fn(root, put) } finally { rmSync(root, { recursive: true, force: true }) }
 }
 function packageFixture(root, put) {
-  put('package.json', JSON.stringify({ name: '@hideinmatrix/computer-use', version: '0.1.3', repository: {url:'git+https://github.com/HideInMatrix/computer-use.git'}, exports: {'.':{import:'./dist/index.js',types:'./dist/index.d.ts'}, './package.json':'./package.json'} }))
+  put('package.json', JSON.stringify({ name: '@hideinmatrix/computer-use', version: '0.2.0', repository: {url:'git+https://github.com/HideInMatrix/computer-use.git'}, exports: {'.':{import:'./dist/index.js',types:'./dist/index.d.ts'}, './package.json':'./package.json'} }))
   for (const f of ['dist/index.js', 'dist/index.d.ts', 'dist/cli.js', 'assets/macos/Info.plist', 'LICENSE', 'THIRD_PARTY_NOTICES.md',
     'third_party/asil/LICENSE', 'third_party/asil/DATA_LICENSE', 'third_party/asil/NOTICE', 'third_party/automation/QUICKJS_LICENSE', 'third_party/automation/PLAYWRIGHT_LICENSE',
     'binaries/aarch64-apple-darwin/development/micromatrix Computer Use Dev.app/Contents/MacOS/micromatrix-computer',

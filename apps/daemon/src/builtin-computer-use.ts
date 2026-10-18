@@ -3,7 +3,8 @@ import { fileURLToPath } from "node:url";
 import { isSea } from "node:sea";
 import { createRequire } from "node:module";
 import { parseExtensions, type ExtensionConfiguration, type McpConnectionConfig } from "@micromatrix/plugin-kit";
-import { browserConfiguration, type BrowserConfiguration } from "@hideinmatrix/computer-use";
+import type { BrowserConfiguration } from "@hideinmatrix/computer-use";
+import { parseComputerUseBrowser } from "./computer-use-browser.js";
 
 export interface ComputerUseConfiguration { readonly enabled: boolean; readonly allowActions: boolean; readonly asilRegistry?: string; readonly environmentRefs?: Readonly<Record<string,string>>; readonly browser?: BrowserConfiguration }
 
@@ -23,7 +24,7 @@ export function builtinComputerUseConfiguration(value: unknown, extensions: Exte
         !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || /^(NODE_OPTIONS|NODE_PATH|PYTHONPATH|PYTHONSTARTUP|LD_.*|DYLD_.*)$/i.test(key)
         || typeof source !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(source)))) throw new Error("Invalid explicit Computer Use environment references");
     configuration = { enabled: Reflect.get(value, "enabled"), allowActions: Reflect.get(value, "allowActions"),
-      ...(registry !== undefined ? {asilRegistry: registry} : {}), ...(environmentRefs !== undefined ? {environmentRefs: {...environmentRefs as Record<string,string>}} : {}), ...(browser!==undefined?{browser:browserConfiguration.parse(browser)}:{}) };
+      ...(registry !== undefined ? {asilRegistry: registry} : {}), ...(environmentRefs !== undefined ? {environmentRefs: {...environmentRefs as Record<string,string>}} : {}), ...(browser!==undefined?{browser:parseComputerUseBrowser(browser)}:{}) };
   }
   return { configuration, extensions: parseExtensions({ ...extensions, mcp: extensions.mcp.filter(connection => connection !== legacy) }) };
 }

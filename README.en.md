@@ -50,7 +50,7 @@ Go beyond reading and writing files: let AI operate your desktop and browser thr
 
 1. Stop Runtime and enable **Computer Use** on the **Plugins** page.
 2. On macOS, click **Configure permissions**, follow the prompts to grant Accessibility and Screen Recording permissions, then recheck the permission status. On Windows, use an interactive desktop session.
-3. For the browser channel, expand **Browser connection**, enter the local endpoint of a separate Chromium browser with debugging enabled and the allowed websites, then save. Saving does not launch the browser.
+3. For the browser channel, expand **Browser connection** and choose a managed separate window (installed Chrome / Edge, or separately prepared Playwright Chromium), then enter a dedicated session name and allowed websites. Existing CDP attach mode remains available. Managed mode keeps dedicated sign-in data in private application storage, not your everyday browser profile. Its window launches only on explicit browser discovery and approval; saving settings or starting Runtime does not launch it.
 4. Start Runtime and call the tools through an authorized MCP client. Control actions follow your current approval policy.
 
 Enabling Computer Use does not automatically start Runtime or a tunnel. Stop Runtime before changing the toggle or browser configuration.

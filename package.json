@@ -27,7 +27,7 @@
     "start": "node apps/daemon/dist/main.js",
     "typecheck": "tsc -b --pretty false",
     "typecheck:web": "node scripts/check-web-types.mjs -p apps/web/tsconfig.sfc.json --pretty false",
-    "check": "npm run typecheck && npm run typecheck:web && npm run build:web && npm run verify:brand && npm run verify:network-health && npm run verify:release-source && npm run verify:i18n && npm run verify:skills",
+    "check": "npm run typecheck && npm run typecheck:web && npm run build:web && npm run verify:brand && npm run verify:network-health && npm run verify:release-source && npm run verify:i18n && npm run verify:skills && npm run verify:computer-use-browser",
     "prepare:version": "node scripts/release-version.mjs",
     "notices": "node scripts/dependency-notices.mjs",
     "verify:source-boundary": "node scripts/verify-source-boundary.mjs",
@@ -38,7 +38,8 @@
     "verify:network-health": "node --test scripts/test-network-health.mjs",
     "verify:skills": "node --test scripts/test-skills.mjs scripts/test-skill-import-ui.mjs",
     "verify:release-source": "node --test scripts/test-release-source.mjs scripts/test-release-rename.mjs",
-    "verify:i18n": "node --test scripts/test-i18n.mjs"
+    "verify:i18n": "node --test scripts/test-i18n.mjs",
+    "verify:computer-use-browser": "node --test scripts/test-computer-use-browser.mjs scripts/test-computer-use-browser-ui.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.87.1",

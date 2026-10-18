@@ -4,7 +4,8 @@ import { dirname, join } from "node:path";
 
 import { ApprovalPolicy } from "@micromatrix/approval";
 import type { RuntimeConfigurationUpdate, RuntimeControl, RuntimeSnapshot, SecretUpdate, BuiltinComputerUseStatus, ComputerUsePermissionStatus } from "@micromatrix/control-plane";
-import { browserConfiguration, DesktopProxy, desktopPlatform } from "@hideinmatrix/computer-use";
+import { DesktopProxy, desktopPlatform } from "@hideinmatrix/computer-use";
+import { parseComputerUseBrowser, computerUseBrowserDataDirectory } from "./computer-use-browser.js";
 import { computerPermissionSnapshot, computerPermissionFailure } from "./computer-use-permissions.js";
 import { computerUseHelperPath } from "./computer-use-host.js";
 import { McpHttpService } from "@micromatrix/mcp-server";
@@ -68,14 +69,8 @@ export class RuntimeSupervisor implements RuntimeControl {
     return this.#exclusive(async () => {
       this.#assertExtensionsEditable();
       if (this.#failureCleanup) await this.#failureCleanup;
-      const parsed = value === null ? undefined : browserConfiguration.safeParse(value);
-      if (parsed && !parsed.success) {
-        const field = parsed.error.issues[0]?.path[0];
-        throw new Error(field === "endpoint" ? "浏览器连接地址须为本机 WebSocket，例如 ws://127.0.0.1:9222/devtools/browser/ID"
-          : field === "allowedOrigins" ? "允许的网站须为 HTTP(S) origin，例如 https://example.com；不含额外路径，最多 32 个"
-          : "浏览器配置只接受连接地址和允许的网站列表");
-      }
-      const browser = parsed?.data;
+      const browser = value === null ? undefined : parseComputerUseBrowser(value);
+      if (browser?.mode === "managed") computerUseBrowserDataDirectory(this.#config.workspace);
       const { browser: _previous, ...configuration } = this.#config.computerUse ?? {enabled: false, allowActions: true};
       // Parse and persist only: no browser connection, profile discovery,
       // download, permission prompt or Runtime/Tunnel startup on Save.

@@ -10,6 +10,7 @@
     }
   },
   "dependencies": {
+    "@hideinmatrix/computer-use": "0.2.0",
     "@micromatrix/approval": "0.1.0",
     "@micromatrix/control-plane": "0.1.0",
     "@micromatrix/mcp-server": "0.1.0",
@@ -21,7 +22,6 @@
     "@micromatrix/plugin-shell": "0.1.0",
     "@micromatrix/plugin-skills": "0.1.0",
     "@micromatrix/plugin-workspace": "0.1.0",
-    "@micromatrix/web-assets": "0.1.0",
-    "@hideinmatrix/computer-use": "0.1.3"
+    "@micromatrix/web-assets": "0.1.0"
   }
 }

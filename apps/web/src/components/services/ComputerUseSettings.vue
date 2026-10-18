@@ -17,13 +17,22 @@ const status = ref<ComputerUseStatusDto | null>(null)
 const busy = ref(false)
 const loadingError = ref('')
 const browserEndpoint = ref('')
+const browserMode = ref<'attach' | 'managed'>('managed')
+const browserChannel = ref<'chrome' | 'msedge' | 'chromium'>('chrome')
+const browserProfile = ref('default')
+const browserStartUrl = ref('')
 const browserOrigins = ref('')
 const browserDirty = ref(false)
 const browserError = ref('')
 function loadBrowser() {
   if (browserDirty.value) return
-  browserEndpoint.value = status.value?.browser?.endpoint ?? ''
-  browserOrigins.value = status.value?.browser?.allowedOrigins.join('\n') ?? ''
+  const browser = status.value?.browser
+  browserMode.value = browser?.mode === 'managed' || !browser ? 'managed' : 'attach'
+  browserEndpoint.value = browser && browser.mode !== 'managed' ? browser.endpoint : ''
+  browserOrigins.value = browser?.allowedOrigins.join('\n') ?? ''
+  browserChannel.value = browser?.mode === 'managed' ? browser.channel ?? 'chrome' : 'chrome'
+  browserProfile.value = browser?.mode === 'managed' ? browser.profile ?? 'default' : 'default'
+  browserStartUrl.value = browser?.mode === 'managed' ? browser.startUrl ?? '' : ''
 }
 const granted = computed(() => status.value?.platform === 'macos'
   ? status.value.permission?.accessibility === true : status.value?.permission?.interactiveDesktop === true)
@@ -74,8 +83,12 @@ async function saveBrowser(clear = false) {
     browserError.value = ''
     const endpoint = browserEndpoint.value.trim()
     const allowedOrigins = [...new Set(browserOrigins.value.split(/\r?\n/).map(value => value.trim()).filter(Boolean))]
-    if (!clear && (!endpoint || !allowedOrigins.length)) throw new Error(t("填写本地连接地址和至少一个允许的网站"))
-    status.value = await desktopApi.configureComputerUseBrowser(clear ? null : {endpoint, allowedOrigins})
+    if (!clear && !allowedOrigins.length) throw new Error(t("至少填写一个允许的网站"))
+    if (!clear && browserMode.value === 'attach' && !endpoint) throw new Error(t("填写本地连接地址和至少一个允许的网站"))
+    const startUrl = browserStartUrl.value.trim()
+    status.value = await desktopApi.configureComputerUseBrowser(clear ? null : browserMode.value === 'managed'
+      ? { mode: 'managed', channel: browserChannel.value, profile: browserProfile.value.trim(), allowedOrigins, ...(startUrl ? { startUrl } : {}) }
+      : { mode: 'attach', endpoint, allowedOrigins })
     browserDirty.value = false
     loadBrowser()
     emit('changed')
@@ -118,13 +131,23 @@ defineExpose({ refresh: () => action(refresh) })
     <details v-if="status" class="mt-4 border-t border-border pt-3">
       <summary class="cursor-pointer text-sm">{{ t("浏览器连接") }}<span v-if="status.browser" class="ml-2 text-xs text-muted-foreground">{{ t("已配置") }}</span></summary>
       <fieldset :disabled="locked" class="mt-3 space-y-3">
-        <FormField :label="t('本地浏览器连接地址')">
+        <FormField :label="t('浏览器连接方式')">
+          <select v-model="browserMode" :aria-label="t('浏览器连接方式')" @change="browserDirty = true"><option value="managed">{{ t("托管独立窗口（无需 CDP）") }}</option><option value="attach">{{ t("附加现有 CDP 浏览器") }}</option></select>
+        </FormField>
+        <FormField v-if="browserMode === 'attach'" :label="t('本地浏览器连接地址')">
           <input id="computer-browser-endpoint" :aria-label="t('本地浏览器连接地址')" v-model="browserEndpoint" placeholder="ws://127.0.0.1:9222/devtools/browser/…" @input="browserDirty = true" />
         </FormField>
+        <template v-else>
+          <FormField :label="t('浏览器类型')"><select v-model="browserChannel" :aria-label="t('浏览器类型')" @change="browserDirty = true"><option value="chrome">Google Chrome</option><option value="msedge">Microsoft Edge</option><option value="chromium">{{ t("Playwright Chromium（需另行准备）") }}</option></select></FormField>
+          <FormField :label="t('独立会话名')"><input v-model="browserProfile" maxlength="64" placeholder="default" :aria-label="t('独立会话名')" @input="browserDirty = true" /></FormField>
+          <FormField :label="t('起始地址（可选）')"><input v-model="browserStartUrl" placeholder="https://example.com/" :aria-label="t('起始地址（可选）')" @input="browserDirty = true" /></FormField>
+          <p class="text-xs text-muted-foreground">{{ t("使用专用登录态，不读取日常浏览器资料。首次明确选择浏览器通道并经审批后启动独立窗口；保存和启动 Runtime 均不会打开浏览器。") }}</p>
+          <p class="text-xs text-muted-foreground">{{ t("Chrome / Edge 必须已安装；Chromium 需要另行准备匹配版本，不会自动下载。停止 Runtime 会关闭托管窗口，保留独立会话。") }}</p>
+        </template>
         <FormField :label="t('允许的网站（每行一个）')">
           <textarea id="computer-browser-origins" :aria-label="t('允许的网站')" v-model="browserOrigins" :rows="3" placeholder="https://example.com" @input="browserDirty = true" />
         </FormField>
-        <p class="text-xs text-muted-foreground">{{ t("仅连接已开启调试的独立 Chromium 浏览器；保存不启动浏览器或 Runtime。") }}</p>
+        <p v-if="browserMode === 'attach'" class="text-xs text-muted-foreground">{{ t("仅连接已开启调试的独立 Chromium 浏览器；保存不启动浏览器或 Runtime。") }}</p>
         <p v-if="browserError" role="alert" :aria-label="t('浏览器配置错误')" class="whitespace-pre-wrap text-xs text-destructive">{{ browserError }}</p>
         <div class="flex gap-2">
           <Button size="sm" :disabled="locked || !browserDirty" @click="saveBrowser()">{{ t("保存") }}</Button>

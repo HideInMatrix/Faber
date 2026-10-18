@@ -3,6 +3,16 @@ export const LOCALE_STORAGE_KEY = 'faber-interface-language'
 
 // Default/fallback messages stay Chinese. Raw logs and user content are not translated.
 export const englishMessages: Readonly<Record<string, string>> = {
+  '浏览器连接方式': 'Browser connection mode',
+  '托管独立窗口（无需 CDP）': 'Managed separate window (no CDP setup)',
+  '附加现有 CDP 浏览器': 'Attach to an existing CDP browser',
+  '浏览器类型': 'Browser type',
+  'Playwright Chromium（需另行准备）': 'Playwright Chromium (separate setup required)',
+  '独立会话名': 'Dedicated session name',
+  '起始地址（可选）': 'Start URL (optional)',
+  '至少填写一个允许的网站': 'Enter at least one allowed website',
+  '使用专用登录态，不读取日常浏览器资料。首次明确选择浏览器通道并经审批后启动独立窗口；保存和启动 Runtime 均不会打开浏览器。': 'Uses dedicated sign-in data, not your everyday browser profile. An independent window starts only after explicit browser discovery and approval; saving settings or starting Runtime does not open it.',
+  'Chrome / Edge 必须已安装；Chromium 需要另行准备匹配版本，不会自动下载。停止 Runtime 会关闭托管窗口，保留独立会话。': 'Chrome / Edge must already be installed. Chromium requires a separately prepared matching version; no automatic download. Stopping Runtime closes the managed window and preserves its dedicated session.',
   '请先扫描目录并选择要添加的 Skill。': 'Scan a directory and select the Skills to add first.',
   '已添加 {value0} 个独立 Skill 配置；下次启动 Runtime 加载。': 'Added {value0} independent Skill configurations. They load when Runtime starts next.',
   '扫描后按文件夹名生成独立配置；Skill 名称仍取自文档，每项可单独启停和移除。': 'Scanning generates independent configurations from folder names. Skill names still come from their documents; each can be toggled or removed separately.',

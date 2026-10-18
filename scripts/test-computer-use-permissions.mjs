@@ -6,7 +6,7 @@ const {build}=await import(pathToFileURL(root+'/node_modules/esbuild/lib/main.js
 async function load(relative){const result=await build({entryPoints:[root+'/'+relative],bundle:true,write:false,platform:'node',format:'esm'});return import('data:text/javascript;base64,'+Buffer.from(result.outputFiles[0].text).toString('base64'));}
 const {computerPermissionLabel}=await load('apps/web/src/lib/computer-use-permissions.ts');
 const {computerPermissionSnapshot,computerPermissionFailure}=await load('apps/daemon/src/computer-use-permissions.ts');
-const raw={platform:'macos',helper_path:'/Applications/test/Computer Use.app',accessibility:true,screen_recording:true,pid:123,bundle_id:'test',signing_mode:'certificate',component_version:'0.1.3',native_protocol:3,prompt_requested:false};
+const raw={platform:'macos',helper_path:'/Applications/test/Computer Use.app',accessibility:true,screen_recording:true,pid:123,bundle_id:'test',signing_mode:'certificate',component_version:'0.2.0',native_protocol:3,prompt_requested:false};
 const permission=computerPermissionSnapshot(raw,'macos',raw.helper_path,'probe');
 const base={enabled:true,platform:'macos',permission,error:''};
 assert.equal(computerPermissionLabel(base),'辅助功能已授权 · 屏幕录制已授权');

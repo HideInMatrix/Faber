@@ -138,8 +138,12 @@ export interface PiMcpConnectionDto {
   headers: Record<string, string>
 }
 
+export type ComputerUseBrowserConfigurationDto =
+  | { mode?: 'attach'; endpoint: string; allowedOrigins: string[] }
+  | { mode: 'managed'; channel: 'chromium' | 'chrome' | 'msedge'; profile: string; allowedOrigins: string[]; startUrl?: string };
+
 export interface ComputerUseStatusDto {
-  readonly browser?: { readonly endpoint: string; readonly allowedOrigins: readonly string[] };
+  readonly browser?: ComputerUseBrowserConfigurationDto;
   enabled: boolean
   allowActions: boolean
   supported: boolean

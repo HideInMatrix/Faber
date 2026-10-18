@@ -28,7 +28,7 @@ try {
   const capabilities = await client.callTool({name:'computer_capabilities',arguments:{}})
   assert(!capabilities.isError)
   const c = JSON.parse(capabilities.content[0].text)
-  assert.equal(c.contract.component_version, '0.1.3')
+  assert.equal(c.contract.component_version, '0.2.0')
   assert.equal(c.contract.native_protocol, 3)
   assert.equal(c.contract.tool_count, 9)
   assert.equal(c.actions_enabled, false)
@@ -45,7 +45,13 @@ try {
   const batchClient = new Client({ name: 'private-package-batch-smoke', version: '1.0.0' })
   try {
     await batchClient.connect(new StdioClientTransport({ command: process.execPath,
-      args: [path.resolve('dist/micromatrix-service.cjs'), '--computer-use-mcp', '--workspace', fixture, '--allow-actions'], stderr: 'pipe' }))
+      args: [path.resolve('dist/micromatrix-service.cjs'), '--computer-use-mcp', '--workspace', fixture, '--allow-actions',
+        '--browser-configuration', JSON.stringify({ mode: 'managed', channel: 'chrome', profile: 'integration-smoke', allowedOrigins: ['https://example.com/'] })], stderr: 'pipe' }))
+    const managedTools = (await batchClient.listTools()).tools
+    assert.equal(managedTools.find(tool => tool.name === 'computer_targets').annotations.readOnlyHint, false)
+    const managedCapabilities = await batchClient.callTool({ name: 'computer_capabilities', arguments: {} })
+    assert(!managedCapabilities.isError)
+    assert(JSON.parse(managedCapabilities.content[0].text).adapters.some(adapter => adapter.id === 'browser'))
     const result = await batchClient.callTool({name:'computer_run',arguments:{code:'const c = await computer.capabilities(); return {enabled:c.actions_enabled};'}})
     assert(!result.isError, JSON.stringify(result))
     assert.equal(JSON.parse(result.content[0].text).result.enabled, true)

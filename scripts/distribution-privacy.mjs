@@ -30,7 +30,7 @@ export function assertPrivatePackage(directory) {
     'binaries/x86_64-pc-windows-msvc/development/micromatrix-computer-x86_64-pc-windows-msvc.exe']
   for (const file of required) if (!files.includes(file)) throw new Error(`Private package missing: ${file}`)
   const pkg = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8'))
-  if (pkg.name !== '@hideinmatrix/computer-use' || pkg.version !== '0.1.3'
+  if (pkg.name !== '@hideinmatrix/computer-use' || pkg.version !== '0.2.0'
     || pkg.repository?.url !== 'git+https://github.com/HideInMatrix/computer-use.git'
     || pkg.scripts || pkg.devDependencies
     || Object.keys(pkg.exports ?? {}).sort().join('|') !== '.|./package.json') {
