@@ -16,6 +16,7 @@ import type {
   PiExtensionConfigurationDto,
   PiExtensionsDto,
   PiMcpConnectionDto,
+  PiSkillImportPreviewDto,
   ComputerUseStatusDto,
 } from '../types'
 
@@ -123,6 +124,8 @@ export const desktopApi = {
   },
   configurePiExtensions: (configuration: PiExtensionConfigurationDto) => call<boolean>('configure_pi_extensions', configuration),
   createPiSkill: (id: string, description: string, instructions: string) => call<boolean>('create_pi_skill', id, description, instructions),
+  previewPiSkillImport: (path: string, replaceSourceId?: string) => call<PiSkillImportPreviewDto>('preview_pi_skill_import', path, ...(replaceSourceId === undefined ? [] : [replaceSourceId])),
+  importPiSkills: (path: string, selection: string[], replaceSourceId?: string) => call<number>('import_pi_skills', path, selection, ...(replaceSourceId === undefined ? [] : [replaceSourceId])),
   testPiMcp: (connection: PiMcpConnectionDto) => call<{ tools: string[] }>('test_pi_mcp', connection),
   setPiMcpCredentials: (id: string, updates: Record<string, string | null>) => call<boolean>('set_pi_mcp_credentials', id, updates),
   loginPiMcp: (id: string) => call<{ url: string }>('login_pi_mcp', id),

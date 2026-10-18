@@ -181,7 +181,8 @@ export class DesktopCommandRouter {
         return true;
       case "get_pi_extensions":
         return { configuration: runtime.extensions ?? EMPTY_EXTENSIONS, running: runtime.running,
-          host_active: runtime.extensionHostActive ?? false, loaded_skills: runtime.skills ?? [], mcp_status: runtime.mcpStatus ?? {} };
+          host_active: runtime.extensionHostActive ?? false, loaded_skills: runtime.skills ?? [], mcp_status: runtime.mcpStatus ?? {},
+          skill_diagnostics: await this.#options.runtime.skillSourceDiagnostics?.() ?? [] };
       case "get_computer_use_mcp_template":
         if (!this.#options.runtime.computerUseConnection) throw new Error("Computer Use MCP template unavailable");
         return this.#options.runtime.computerUseConnection();
@@ -210,6 +211,21 @@ export class DesktopCommandRouter {
         if (!this.#options.runtime.createSkill) throw new Error("Pi Skill creation unavailable");
         await this.#options.runtime.createSkill(String(request.args[0] ?? ""), String(request.args[1] ?? ""), String(request.args[2] ?? ""));
         return true;
+      case "preview_pi_skill_import":
+      case "import_pi_skills": {
+        const [path, selectionOrReplacement, replacement] = request.args;
+        if (typeof path !== "string" || !path.trim() || path.length > 4096) throw new Error("Invalid Skill import path");
+        const replacing = request.method === "import_pi_skills" ? replacement : selectionOrReplacement;
+        if (replacing !== undefined && (typeof replacing !== "string" || !replacing || replacing.length > 64)) throw new Error("Invalid Skill source ID");
+        if (request.method === "preview_pi_skill_import") {
+          if (!this.#options.runtime.previewSkillImport) throw new Error("Skill directory discovery unavailable");
+          return this.#options.runtime.previewSkillImport(path.trim(), replacing as string | undefined);
+        }
+        if (!this.#options.runtime.importSkills) throw new Error("Skill directory import unavailable");
+        if (!Array.isArray(selectionOrReplacement) || !selectionOrReplacement.length || selectionOrReplacement.length > 100
+          || !selectionOrReplacement.every(item => typeof item === "string" && item.length <= 4096)) throw new Error("Select 1-100 Skill documents");
+        return this.#options.runtime.importSkills(path.trim(), selectionOrReplacement, replacing as string | undefined);
+      }
       case "test_pi_mcp":
         if (!this.#options.runtime.testMcpConnection) throw new Error("Pi MCP connection testing unavailable");
         return this.#options.runtime.testMcpConnection(parseMcpConnection(request.args[0]));

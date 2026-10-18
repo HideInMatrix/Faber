@@ -51,10 +51,14 @@ export async function supportFiles(root: string): Promise<readonly { path: strin
   await walk(await realpath(root), "", 0);
   return result.sort((a, b) => a.path.localeCompare(b.path));
 }
-export function discoverSkillFiles(sources: readonly SkillSourceConfig[], workspace: string, enabledOnly = false) {
+export function inspectSkillSources(sources: readonly SkillSourceConfig[], workspace: string, enabledOnly = false) {
   const result = loadSkills({ cwd: workspace, agentDir: workspace, skillPaths: sources.filter(source => !enabledOnly || source.enabled).map(source => source.path), includeDefaults: false });
-  if (result.diagnostics.length) throw new Error(`Pi Skill validation failed: ${result.diagnostics.map(item => item.message).join("; ")}`);
-  return result.skills;
+  const blocking = result.diagnostics.filter(item => item.type !== "warning");
+  if (blocking.length) throw new Error(`Pi Skill validation failed: ${blocking.map(item => `${item.path}: ${item.message}`).join("; ")}`);
+  return result;
+}
+export function discoverSkillFiles(sources: readonly SkillSourceConfig[], workspace: string, enabledOnly = false) {
+  return inspectSkillSources(sources, workspace, enabledOnly).skills;
 }
 export async function readSkillDocument(sources: readonly SkillSourceConfig[], workspace: string, id: string) {
   const skill = discoverSkillFiles(sources, workspace).find(skill => skill.name === id);

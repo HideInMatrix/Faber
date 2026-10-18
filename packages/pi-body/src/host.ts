@@ -59,7 +59,11 @@ export class PiBodyHost {
       loader.extendResources({ skillPaths: discovered.skillPaths.map((entry) => ({ path: entry.path,
         metadata: { source: entry.extensionPath, scope: "temporary", origin: "top-level" } })) });
       const diagnostics = loader.getSkills().diagnostics;
-      if (diagnostics.length) throw new Error(`Pi Skill validation failed: ${diagnostics.map((item) => item.message).join("; ")}`);
+      const blocking = diagnostics.filter(item => item.type !== "warning");
+      if (blocking.length) throw new Error(`Pi Skill validation failed: ${blocking.map((item) => `${item.path}: ${item.message}`).join("; ")}`);
+      // Pi deliberately loads usable skills with frontmatter warnings. Do not
+      // turn one warning into a failure of every skill in an imported folder.
+      for (const diagnostic of diagnostics) context.logger.log("warn", "Pi Skill warning", { path: diagnostic.path, message: diagnostic.message });
       // Detect collisions explicitly: Pi's runner otherwise takes the first tool.
       const names = loaded.extensions.flatMap((extension) => [...extension.tools.keys()]);
       if (new Set(names).size !== names.length) throw new Error("Pi extensions registered conflicting tool names");

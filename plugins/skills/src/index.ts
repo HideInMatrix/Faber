@@ -5,7 +5,8 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { SkillSourceConfig } from "@micromatrix/plugin-kit";
 
 import { boundedRead, supportingPath, supportFiles } from "./files.js";
-export { readSkillDocument, editSkillDocument, discoverSkillFiles } from "./files.js";
+export { readSkillDocument, editSkillDocument, discoverSkillFiles, inspectSkillSources } from "./files.js";
+export { previewSkillImport, planSkillImport, type SkillImportPreview } from "./import.js";
 
 export interface LoadedSkill {
   readonly id: string;
@@ -23,11 +24,12 @@ export function loadedSkills(loader: ResourceLoader): readonly LoadedSkill[] {
 export async function validateSkillSource(path: string, workspace: string): Promise<void> {
   if (!isAbsolute(path)) throw new Error("Skill import path must be absolute");
   const result = loadSkills({ cwd: workspace, agentDir: workspace, skillPaths: [path], includeDefaults: false });
-  if (!result.skills.length || result.diagnostics.length) throw new Error(`Invalid skill source: ${result.diagnostics.map((item) => item.message).join("; ") || "No SKILL.md found"}`);
+  const blocking = result.diagnostics.filter(item => item.type !== "warning");
+  if (!result.skills.length || blocking.length) throw new Error(`Invalid skill source (${path}): ${(blocking.length ? blocking : result.diagnostics).map((item) => `${item.path}: ${item.message}`).join("; ") || "No loadable SKILL.md found"}`);
 }
 
 export async function createSkillFile(root: string, id: string, description: string, instructions: string): Promise<string> {
-  if (!/^[a-z][a-z0-9-]{0,23}$/.test(id) || id.includes("--") || id.endsWith("-") || !description.trim() || description.length > 1024 || !instructions.trim() || instructions.length > 256_000) throw new Error("Invalid Skill name, description or instructions");
+  if (!/^[a-z][a-z0-9-]{0,63}$/.test(id) || id.includes("--") || id.endsWith("-") || !description.trim() || description.length > 1024 || !instructions.trim() || instructions.length > 256_000) throw new Error("Invalid Skill name (1-64 characters, starting with a lowercase letter; lowercase letters, digits or single hyphens only), description or instructions");
   const document = `---\nname: ${id}\ndescription: ${JSON.stringify(description.trim())}\n---\n\n${instructions}\n`;
   if (Buffer.byteLength(document) > 256_000) throw new Error("Skill document is too large");
   const folder = join(root, id);

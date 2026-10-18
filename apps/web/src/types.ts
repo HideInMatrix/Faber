@@ -155,11 +155,17 @@ export interface ComputerUseStatusDto {
 }
 
 export interface PiSkillSourceDto { id: string; path: string; enabled: boolean }
+export interface PiSkillImportPreviewDto {
+  path: string
+  candidates: Array<{ id: string; name: string; description: string; path: string; status: 'new' | 'existing' | 'conflict'; warnings: string[] }>
+  diagnostics: Array<{ path: string; message: string }>
+}
 export interface PiExtensionConfigurationDto { mcp: PiMcpConnectionDto[]; skills: PiSkillSourceDto[] }
 export interface PiExtensionsDto {
   configuration: PiExtensionConfigurationDto
   running: boolean
   host_active: boolean
+  skill_diagnostics?: Array<{ path: string; message: string }>
   mcp_status?: Record<string, { keys: string[]; oauth: string; status: string; message: string; discoveredAt: number }>
   loaded_skills: Array<{ id: string; name: string; description: string; disableModelInvocation: boolean }>
 }

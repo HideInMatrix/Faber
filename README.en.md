@@ -55,6 +55,12 @@ Go beyond reading and writing files: let AI operate your desktop and browser thr
 
 Enabling Computer Use does not automatically start Runtime or a tunnel. Stop Runtime before changing the toggle or browser configuration.
 
+## Importing Skills
+
+Stop Runtime, open **Plugins → Skills → Add Skill**, select a local directory or `SKILL.md`, then scan and select the documents to import. Each document gets an independent configuration: its ID defaults to the folder name, while the Skill keeps its document's `name`. Each can be toggled or removed separately; a single source ID for the entire root directory is no longer required.
+
+Already configured files (including disabled entries) are skipped, and conflicting Skill names are marked in the preview. Compatibility warnings do not block other documents. Existing directory sources offer **Split directory**: confirmation replaces that reference with the selected independent entries; cancelling leaves it unchanged. Import only saves file references: it does not copy, delete or execute original files, or automatically load unconfigured global directories.
+
 ## Interface language
 
 The interface defaults to Chinese. Choose **English** from the language dropdown at the bottom of the sidebar menu. Your choice is remembered on this computer. Changing the language does not start or stop Runtime, or change your working directory, credentials, or approval settings.

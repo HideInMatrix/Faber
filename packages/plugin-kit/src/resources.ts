@@ -42,8 +42,12 @@ function text(value: unknown, label: string, max = 4096): string {
 }
 
 function id(value: unknown, skill = false): string {
-  const result = text(value, "extension ID", 24);
-  if (!(skill ? /^[a-z][a-z0-9_-]{0,23}$/ : /^[a-z][a-z0-9_]{0,23}$/).test(result)) throw new Error("Extension ID must start with a lowercase letter (max 24); MCP IDs use letters, digits and underscores");
+  const result = text(value, skill ? "Skill source ID (max 64 characters)" : "extension ID", skill ? 64 : 24);
+  // Source IDs are configuration labels, not SKILL.md frontmatter names.
+  // Retain underscore compatibility with existing imported sources.
+  if (!(skill ? /^[a-z][a-z0-9_-]{0,63}$/ : /^[a-z][a-z0-9_]{0,23}$/).test(result)) throw new Error(skill
+    ? "Skill source ID must start with a lowercase letter and use lowercase letters, digits, hyphens or underscores (max 64)"
+    : "Extension ID must start with a lowercase letter (max 24); MCP IDs use letters, digits and underscores");
   return result;
 }
 

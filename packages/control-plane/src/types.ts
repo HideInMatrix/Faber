@@ -93,6 +93,12 @@ export interface RuntimeTool {
 }
 
 export interface RuntimeControl {
+  previewSkillImport?(path: string, replaceSourceId?: string): Promise<{
+    path: string;
+    candidates: readonly { id: string; name: string; description: string; path: string; status: "new" | "existing" | "conflict"; warnings: readonly string[] }[];
+    diagnostics: readonly { path: string; message: string }[];
+  }>;
+  importSkills?(path: string, selectedPaths: readonly string[], replaceSourceId?: string): Promise<number>;
   computerUseStatus?(): BuiltinComputerUseStatus;
   configureComputerUseBrowser?(value: unknown): Promise<void>;
   setComputerUseEnabled?(enabled: boolean): Promise<void>;
@@ -111,6 +117,7 @@ export interface RuntimeControl {
   logoutMcp?(id: string): Promise<void>;
   refreshMcpTools?(id: string): Promise<void>;
   skillDocuments?(): Promise<readonly { id: string; description: string }[]>;
+  skillSourceDiagnostics?(): Promise<readonly { path: string; message: string }[]>;
   readSkill?(id: string): Promise<{ id: string; document: string; revision: string; files: readonly { path: string; size: number }[] }>;
   editSkill?(id: string, document: string, revision: string): Promise<void>;
   testMcpConnection?(value: McpConnectionConfig): Promise<{ readonly tools: readonly string[] }>;

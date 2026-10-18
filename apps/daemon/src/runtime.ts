@@ -23,7 +23,7 @@ import { LocalOAuthServer } from "@micromatrix/oauth";
 import { PluginRegistry, parseExtensions, type ExtensionConfiguration, type McpConnectionConfig, type PluginLogger } from "@micromatrix/plugin-kit";
 import { PiBodyHost, createPiBodyExtension } from "@micromatrix/pi-body";
 import { createMcpExtension, McpConnection, McpAuthStore, type McpExtensionController, type McpOptions } from "@micromatrix/plugin-mcp";
-import { createSkillsExtension, createSkillFile, loadedSkills, removeCreatedSkill, validateSkillSource, readSkillDocument, editSkillDocument, discoverSkillFiles } from "@micromatrix/plugin-skills";
+import { createSkillsExtension, createSkillFile, loadedSkills, removeCreatedSkill, validateSkillSource, readSkillDocument, editSkillDocument, discoverSkillFiles, inspectSkillSources, previewSkillImport, planSkillImport } from "@micromatrix/plugin-skills";
 import { createShellPlugin } from "@micromatrix/plugin-shell";
 import { createWorkspacePlugin } from "@micromatrix/plugin-workspace";
 
@@ -443,6 +443,23 @@ export class RuntimeSupervisor implements RuntimeControl {
     });
   }
 
+  async previewSkillImport(path: string, replaceSourceId?: string): Promise<Awaited<ReturnType<typeof previewSkillImport>>> {
+    return previewSkillImport(path, this.#config.workspace, parseExtensions(this.#config.extensions).skills, replaceSourceId);
+  }
+  async importSkills(path: string, selectedPaths: readonly string[], replaceSourceId?: string): Promise<number> {
+    return this.#exclusive(async () => {
+      this.#assertExtensionsEditable();
+      if (this.#failureCleanup) await this.#failureCleanup;
+      const previous = parseExtensions(this.#config.extensions);
+      const skills = await planSkillImport(path, selectedPaths, this.#config.workspace, previous.skills, replaceSourceId);
+      const extensions = parseExtensions({ ...previous, skills });
+      for (const source of skills) if (selectedPaths.includes(source.path)) await validateSkillSource(source.path, this.#config.workspace);
+      discoverSkillFiles(extensions.skills, this.#config.workspace, true);
+      await this.#saveExtensions(extensions);
+      return selectedPaths.length;
+    });
+  }
+
   async testMcpConnection(value: McpConnectionConfig): Promise<{ tools: readonly string[] }> {
     return this.#exclusive(async () => {
       this.#assertExtensionsEditable();
@@ -503,6 +520,9 @@ export class RuntimeSupervisor implements RuntimeControl {
   }
   async skillDocuments(): Promise<readonly { id: string; description: string }[]> {
     return discoverSkillFiles(parseExtensions(this.#config.extensions).skills, this.#config.workspace).map(skill => ({ id: skill.name, description: skill.description }));
+  }
+  async skillSourceDiagnostics(): Promise<readonly { path: string; message: string }[]> {
+    return inspectSkillSources(parseExtensions(this.#config.extensions).skills, this.#config.workspace).diagnostics.map(({ path, message }) => ({ path: path ?? "", message }));
   }
   async readSkill(id: string): Promise<Awaited<ReturnType<typeof readSkillDocument>>> {
     return readSkillDocument(parseExtensions(this.#config.extensions).skills, this.#config.workspace, id);
