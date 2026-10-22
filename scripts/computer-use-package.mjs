@@ -1,22 +1,22 @@
 import { createRequire } from 'node:module'
 import { readFileSync, realpathSync } from 'node:fs'
 import path from 'node:path'
-import { assertPrivatePackage } from './distribution-privacy.mjs'
+import { assertComputerUsePackage } from './distribution-privacy.mjs'
 
 // Resolve from the workspace declaring the dependency, even if npm nests it.
 const daemonRequire = createRequire(new URL('../apps/daemon/package.json', import.meta.url))
 export const computerUsePackageRoot = path.dirname(daemonRequire.resolve('@hideinmatrix/computer-use/package.json'))
 if (realpathSync(computerUsePackageRoot) !== path.resolve(computerUsePackageRoot)
   || !computerUsePackageRoot.split(path.sep).includes('node_modules')) {
-  throw new Error('Computer Use must be an installed private package, not a linked source workspace; run npm ci with GitHub Packages authentication')
+  throw new Error('Computer Use must be an installed registry package, not a linked source workspace; run npm ci with GitHub Packages authentication')
 }
 export const computerUseRequire = createRequire(path.join(computerUsePackageRoot, 'package.json'))
 const computerUsePackage = JSON.parse(readFileSync(path.join(computerUsePackageRoot, 'package.json'), 'utf8'))
-if (computerUsePackage.name !== '@hideinmatrix/computer-use' || computerUsePackage.version !== '0.2.0'
+if (computerUsePackage.name !== '@hideinmatrix/computer-use' || computerUsePackage.version !== '0.4.0'
   || computerUsePackage.repository?.url !== 'git+https://github.com/HideInMatrix/computer-use.git') {
   throw new Error('Unexpected Computer Use package; review native/API/resource contracts before upgrading')
 }
-assertPrivatePackage(computerUsePackageRoot)
+assertComputerUsePackage(computerUsePackageRoot)
 
 export const computerUseTargets = ['aarch64-apple-darwin', 'x86_64-apple-darwin', 'x86_64-pc-windows-msvc']
 export function computerUseNativeResource(target) {

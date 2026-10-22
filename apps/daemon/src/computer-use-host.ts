@@ -10,7 +10,7 @@ import {
 } from "@hideinmatrix/computer-use";
 
 /** Host-owned installation paths; never supplied by the model or saved config.
- * The private package owns adapters/protocols; Workbench owns desktop packaging. */
+ * The Computer Use package owns adapters/protocols; Workbench owns desktop packaging. */
 export function computerUseHelperPath(): string {
   const platform = desktopPlatform();
   const triple = platform.os === "darwin"

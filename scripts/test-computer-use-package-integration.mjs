@@ -23,14 +23,16 @@ try {
   await writeFile(path.join(fixture, 'sample.json'), '{"count":1}')
   await client.connect(transport)
   const tools = (await client.listTools()).tools
-  assert.equal(tools.length, 9)
+  assert.equal(tools.length, 11)
+  assert.equal(tools.find(tool => tool.name === 'computer_wait')?.annotations.readOnlyHint, true)
+  assert.equal(tools.find(tool => tool.name === 'computer_batch')?.annotations.readOnlyHint, false)
   assert(tools.some(tool => tool.name === 'computer_run'))
   const capabilities = await client.callTool({name:'computer_capabilities',arguments:{}})
   assert(!capabilities.isError)
   const c = JSON.parse(capabilities.content[0].text)
-  assert.equal(c.contract.component_version, '0.2.0')
+  assert.equal(c.contract.component_version, '0.4.0')
   assert.equal(c.contract.native_protocol, 3)
-  assert.equal(c.contract.tool_count, 9)
+  assert.equal(c.contract.tool_count, 11)
   assert.equal(c.actions_enabled, false)
   assert(c.adapters.some(adapter => adapter.id === 'desktop-visual'))
   assert(c.adapters.some(adapter => adapter.id === 'remote-desktop'))
@@ -56,7 +58,7 @@ try {
     assert(!result.isError, JSON.stringify(result))
     assert.equal(JSON.parse(result.content[0].text).result.enabled, true)
   } finally { await batchClient.close() }
-  console.log('PASS private package host MCP: 9 tools, ABI 3, JSON observe, bundled QuickJS and map-free Playwright load; no desktop actions')
+  console.log('PASS package host MCP: 11 tools, ABI 3, JSON observe, bundled QuickJS and map-free Playwright load; no desktop actions')
 } finally {
   await client.close()
   await rm(fixture, {recursive:true,force:true})

@@ -10,7 +10,7 @@
     }
   },
   "dependencies": {
-    "@hideinmatrix/computer-use": "0.2.0",
+    "@hideinmatrix/computer-use": "0.4.0",
     "@micromatrix/approval": "0.1.0",
     "@micromatrix/control-plane": "0.1.0",
     "@micromatrix/mcp-server": "0.1.0",

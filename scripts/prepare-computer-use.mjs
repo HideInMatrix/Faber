@@ -11,8 +11,8 @@ export function prepareComputerUse(root = process.cwd()) {
   const windows = process.platform === 'win32'
   const release = buildChannel() === 'release'
   const identity = windows ? null : macSigningIdentity()
-  // Consume the pinned private package's precompiled helper. Never compile
-  // private source in Workbench; preserve the host's signing/TCC identity.
+  // Consume the pinned registry package's precompiled helper. Never compile
+  // upstream source in Workbench; preserve the host's signing/TCC identity.
   const resource = computerUseNativeResource(triple)
   const output = path.join(root, `apps/desktop/binaries/micromatrix-computer-${triple}${windows ? '.exe' : ''}`)
   mkdirSync(path.dirname(output), { recursive: true })

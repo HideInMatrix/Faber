@@ -3,14 +3,14 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { assertPrivatePackage, assertDistributionTree, cleanGeneratedMaps, stripSourceMaps, hasSourceMap } from './distribution-privacy.mjs'
+import { assertComputerUsePackage, assertDistributionTree, cleanGeneratedMaps, stripSourceMaps, hasSourceMap } from './distribution-privacy.mjs'
 function fixture(fn) {
   const root = mkdtempSync(path.join(tmpdir(), 'mm-privacy-'))
   const put = (file, text = '') => { mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); writeFileSync(path.join(root, file), text) }
   try { fn(root, put) } finally { rmSync(root, { recursive: true, force: true }) }
 }
 function packageFixture(root, put) {
-  put('package.json', JSON.stringify({ name: '@hideinmatrix/computer-use', version: '0.2.0', repository: {url:'git+https://github.com/HideInMatrix/computer-use.git'}, exports: {'.':{import:'./dist/index.js',types:'./dist/index.d.ts'}, './package.json':'./package.json'} }))
+  put('package.json', JSON.stringify({ name: '@hideinmatrix/computer-use', version: '0.4.0', repository: {url:'git+https://github.com/HideInMatrix/computer-use.git'}, exports: {'.':{import:'./dist/index.js',types:'./dist/index.d.ts'}, './package.json':'./package.json'} }))
   for (const f of ['dist/index.js', 'dist/index.d.ts', 'dist/cli.js', 'assets/macos/Info.plist', 'LICENSE', 'THIRD_PARTY_NOTICES.md',
     'third_party/asil/LICENSE', 'third_party/asil/DATA_LICENSE', 'third_party/asil/NOTICE', 'third_party/automation/QUICKJS_LICENSE', 'third_party/automation/PLAYWRIGHT_LICENSE',
     'binaries/aarch64-apple-darwin/development/micromatrix Computer Use Dev.app/Contents/MacOS/micromatrix-computer',
@@ -18,21 +18,21 @@ function packageFixture(root, put) {
     'binaries/x86_64-pc-windows-msvc/development/micromatrix-computer-x86_64-pc-windows-msvc.exe']) put(f)
 }
 test('compiled package permits declarations, licenses and three native helpers', () => fixture((root, put) => {
-  packageFixture(root, put); assert.equal(assertPrivatePackage(root), 15)
+  packageFixture(root, put); assert.equal(assertComputerUsePackage(root), 15)
 }))
 for (const file of ['src/runtime.ts', 'native/macos.swift', 'native/windows.cs', 'dist/index.js.map', 'dist/index.d.ts.map', 'debug/helper.pdb', '.npmrc']) {
-  test(`private package rejects ${file}`, () => fixture((root, put) => {
-    packageFixture(root, put); put(file); assert.throws(() => assertPrivatePackage(root), /refused/)
+  test(`compiled package rejects ${file}`, () => fixture((root, put) => {
+    packageFixture(root, put); put(file); assert.throws(() => assertComputerUsePackage(root), /refused/)
   }))
 }
-test('private package rejects lifecycle scripts', () => fixture((root, put) => {
+test('compiled package rejects lifecycle scripts', () => fixture((root, put) => {
   packageFixture(root, put)
   const pkg=JSON.parse(readFileSync(path.join(root,'package.json')));pkg.scripts={postinstall:'false'}
-  put('package.json',JSON.stringify(pkg));assert.throws(()=>assertPrivatePackage(root),/manifest/)
+  put('package.json',JSON.stringify(pkg));assert.throws(()=>assertComputerUsePackage(root),/manifest/)
 }))
-test('private package rejects missing architecture', () => fixture((root, put) => {
+test('compiled package rejects missing architecture', () => fixture((root, put) => {
   packageFixture(root, put);rmSync(path.join(root,'binaries/x86_64-pc-windows-msvc/development/micromatrix-computer-x86_64-pc-windows-msvc.exe'))
-  assert.throws(()=>assertPrivatePackage(root),/missing/)
+  assert.throws(()=>assertComputerUsePackage(root),/missing/)
 }))
 test('file and inline source maps are refused; cleaning preserves executable JS', () => {
   for (const ref of ['//# sourceMappingURL=x.js.map', '//@ sourceMappingURL=x.js.map', '/*# sourceMappingURL=data:application/json;base64,e30= */']) {
