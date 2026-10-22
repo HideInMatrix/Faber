@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { verifyReleaseSource } from './verify-release-source.mjs'
 
 const env = {
@@ -62,11 +62,24 @@ test('All secret-bearing desktop jobs allow the approved public owner tag and de
   }
 })
 
-test('Legacy private master checks/manual builds remain available, never manual release publication', () => {
+test('Branch and manual builds remain disabled even in the private repository', () => {
   const privateMaster = { event: { repository: { private: true } }, ref_type: 'branch', ref: 'refs/heads/master' }
-  assert.equal(workflowAllows('verify', privateMaster), true)
-  assert.equal(workflowAllows('build', { ...privateMaster, event_name: 'workflow_dispatch' }), true)
-  assert.equal(workflowAllows('release', { ...privateMaster, event_name: 'workflow_dispatch' }), false)
+  for (const job of ['verify', 'build', 'release']) {
+    assert.equal(workflowAllows(job, privateMaster), false)
+    assert.equal(workflowAllows(job, { ...privateMaster, event_name: 'workflow_dispatch' }), false)
+  }
+})
+
+test('Every active workflow starts only on v-prefixed tag pushes', () => {
+  const directory = new URL('../.github/workflows/', import.meta.url)
+  const files = readdirSync(directory).filter(file => /\.ya?ml$/.test(file))
+  assert(files.includes('desktop.yml'))
+  for (const file of files) {
+    const workflow = readFileSync(new URL(file, directory), 'utf8')
+    const triggers = /^on:\n([\s\S]*?)(?=^[^\s#]|$(?![\s\S]))/m.exec(workflow)?.[1].trim()
+    assert.equal(triggers, "push:\n    tags: ['v*']", file)
+    assert.doesNotMatch(workflow, /workflow_dispatch|pull_request|warm_cache|inputs\./, file)
+  }
 })
 
 test('Source gate precedes secrets; full history, no checkout credentials and no npm cache stay enforced', () => {

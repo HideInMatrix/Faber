@@ -1,3 +1,4 @@
+# Historical v1.0.0 recovery recipe; archived outside workflows to prevent triggers.
 name: Recover Faber release
 run-name: 恢复 Faber 发布 · 复用已验证安装包
 

@@ -1,31 +1,9 @@
 name: Desktop packages
-run-name: ${{ github.event_name == 'push' && github.ref_type == 'branch' && '源码检查' || inputs.warm_cache && '手动 Rust 缓存预热' || '桌面打包' }} · ${{ github.ref_name }}
+run-name: 桌面打包 · ${{ github.ref_name }}
 
 on:
-  workflow_dispatch:
-    inputs:
-      warm_cache:
-        description: 'Only warm Rust caches on master; no installers or release (opt-in, not needed before every release)'
-        type: boolean
-        default: false
-      standalone_service:
-        description: 'Also build an internal standalone service archive (not a public Release asset)'
-        type: boolean
-        default: false
   push:
     tags: ['v*']
-    # Branch pushes run lightweight checks only. Native builds are opt-in or tag-triggered.
-    branches: [master]
-    paths:
-      - 'apps/**'
-      - 'packages/**'
-      - 'plugins/**'
-      - 'scripts/**'
-      - 'third_party/**'
-      - 'package*.json'
-      - 'tsconfig*.json'
-      - '.github/workflows/desktop.yml'
-      - '.npmrc'
 
 permissions:
   contents: read
@@ -36,9 +14,8 @@ concurrency:
 
 jobs:
   verify:
-    # Public builds require this repository's owner-pushed version tag. PRs,
-    # forks, public branch pushes and public manual builds cannot use secrets.
-    if: github.repository == 'HideInMatrix/Faber' && github.repository_id == '1335576308' && ((github.event.repository.private == true && github.ref == 'refs/heads/master') || (github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && github.actor == github.repository_owner))
+    # Only this repository's owner-pushed version tags may use release secrets.
+    if: github.repository == 'HideInMatrix/Faber' && github.repository_id == '1335576308' && github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && github.actor == github.repository_owner
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
@@ -54,23 +31,10 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: '@hideinmatrix'
       - name: Verify owner-pushed release tag belongs to master before using secrets
-        if: github.ref_type == 'tag'
         run: node scripts/verify-release-source.mjs
-      - name: Validate manual cache warm-up request
-        if: github.event_name == 'workflow_dispatch' && inputs.warm_cache
-        env:
-          BUILD_REF: ${{ github.ref }}
-          STANDALONE_SERVICE: ${{ inputs.standalone_service }}
-        shell: bash
-        run: |
-          if [ "$BUILD_REF" != refs/heads/master ] || [ "$STANDALONE_SERVICE" = true ]; then
-            echo "warm_cache requires master and cannot be combined with standalone_service" >&2
-            exit 1
-          fi
       - name: Prepare application version from tag
         run: node scripts/release-version.mjs
       - name: Require updater signing secret before expensive native builds
-        if: (github.event_name == 'workflow_dispatch' || github.ref_type == 'tag') && inputs.warm_cache != true
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         shell: bash
@@ -80,7 +44,6 @@ jobs:
             exit 1
           fi
       - name: Require pinned long-lived macOS signing certificate
-        if: github.ref_type == 'tag'
         env:
           APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY }}
           APPLE_SIGNING_CERTIFICATE_SHA1: ${{ vars.APPLE_SIGNING_CERTIFICATE_SHA1 }}
@@ -106,7 +69,6 @@ jobs:
       - name: Reject high or critical dependency vulnerabilities
         run: npm audit --audit-level=high --registry=https://registry.npmjs.org
       - name: Share the single frontend build with native jobs
-        if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7, Node 24
         with:
           name: shared-web
@@ -115,8 +77,7 @@ jobs:
           retention-days: 14
 
   build:
-    # Never spend native runner time on ordinary branch pushes.
-    if: github.repository == 'HideInMatrix/Faber' && github.repository_id == '1335576308' && ((github.event.repository.private == true && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master') || (github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && github.actor == github.repository_owner))
+    if: github.repository == 'HideInMatrix/Faber' && github.repository_id == '1335576308' && github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && github.actor == github.repository_owner
     needs: verify
     timeout-minutes: 60
     strategy:
@@ -142,12 +103,11 @@ jobs:
     env:
       CI: 'true'
       MICROMATRIX_BUILD_TARGET: ${{ matrix.target }}
-      # Manual branch builds use an isolated Dev identity. Tag builds must use
-      # the same pinned self-signed certificate; never fall back to ad-hoc.
-      APPLE_SIGNING_IDENTITY: ${{ github.ref_type == 'tag' && vars.APPLE_SIGNING_IDENTITY || '-' }}
+      # Release builds always use the pinned certificate, never ad-hoc signing.
+      APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY }}
       APPLE_SIGNING_CERTIFICATE_SHA1: ${{ vars.APPLE_SIGNING_CERTIFICATE_SHA1 }}
       NO_STRIP: 'true'
-      MICROMATRIX_PACKAGE_STANDALONE_SERVICE: ${{ github.event_name == 'workflow_dispatch' && inputs.warm_cache != true && inputs.standalone_service && '1' || '0' }}
+      MICROMATRIX_PACKAGE_STANDALONE_SERVICE: '0'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7, Node 24
         with:
@@ -199,9 +159,8 @@ jobs:
           # Build-script output embeds absolute paths; do not restore the old layout cache.
           shared-key: desktop-apps-${{ matrix.id }}
           cache-bin: false
-          # Reuse existing default-branch caches. Write only during explicit warm-up;
-          # do not rebuild three platforms on every master push just to seed caches.
-          save-if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.warm_cache }}
+          # Reuse existing default-branch caches without writing per-tag caches.
+          save-if: false
           cache-on-failure: false
       - name: Build native Node SEA
         run: npm run build:sidecar -- --prebuilt-web
@@ -209,47 +168,29 @@ jobs:
         run: node scripts/test-computer-use-package-integration.mjs
       - name: Require complete fixed-version dependency notice files
         run: node scripts/dependency-notices.mjs --strict
-      - name: Build Tauri application (installers unless cache warm-up)
+      - name: Build Tauri application and installers
         id: tauri-build
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ inputs.warm_cache != true && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.warm_cache != true && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         shell: bash
         run: |
-          args=(build --ci --verbose --config apps/desktop/tauri.prebuilt.conf.json)
-          if [ "${{ inputs.warm_cache == true }}" = true ]; then
-            # Explicit manual warm-up only; skip updater signing and installers.
-            args+=(--no-bundle)
-          else
-            args+=(--bundles '${{ matrix.bundles }}')
-          fi
-          npm run tauri -- "${args[@]}" -- --locked --timings
+          npm run tauri -- build --ci --verbose --config apps/desktop/tauri.prebuilt.conf.json --bundles '${{ matrix.bundles }}' -- --locked --timings
       - name: Verify final signed macOS bundle
-        if: runner.os == 'macOS' && inputs.warm_cache != true
+        if: runner.os == 'macOS'
         run: node scripts/verify-macos-signing.mjs
       - name: Create and verify headless macOS DMG
-        if: runner.os == 'macOS' && inputs.warm_cache != true
+        if: runner.os == 'macOS'
         run: node scripts/package-macos-dmg.mjs
       - name: Collect installers, signed updates, notices and checksums
-        if: (github.event_name == 'workflow_dispatch' || github.ref_type == 'tag') && inputs.warm_cache != true
         run: node scripts/package-artifacts.mjs
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7, Node 24
-        if: (github.event_name == 'workflow_dispatch' || github.ref_type == 'tag') && inputs.warm_cache != true
         with:
           name: micromatrix-${{ matrix.id }}
           path: dist/artifacts/*
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
-      - name: Upload opt-in internal standalone service separately
-        if: github.event_name == 'workflow_dispatch' && inputs.warm_cache != true && inputs.standalone_service
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7, Node 24
-        with:
-          name: internal-service-${{ matrix.id }}
-          path: dist/internal-artifacts/*
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 7
       - name: Upload macOS packaging diagnostics
         if: always() && runner.os == 'macOS' && steps.tauri-build.outcome != 'skipped'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7, Node 24
