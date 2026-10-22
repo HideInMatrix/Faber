@@ -54,7 +54,7 @@
     "tsx": "4.20.6",
     "typescript": "7.0.2",
     "typescript-sfc": "npm:typescript@6.0.2",
-    "vite": "8.3.1",
+    "vite": "8.3.5",
     "vue-tsc": "3.3.12"
   },
   "overrides": {
