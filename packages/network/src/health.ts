@@ -1,4 +1,36 @@
 import { setTimeout as delay } from "node:timers/promises";
+import { Resolver } from "node:dns/promises";
+import { metadataAddresses } from "./public-dns.js";
+import { pinnedHttpsRequest } from "./outbound.js";
+
+async function proxyHealth(url: URL, signal: AbortSignal, proxyUrl: string): Promise<Response> {
+  if (url.protocol !== "https:" || url.username || url.password) throw new Error("Proxy health checks require a public HTTPS URL");
+  const resolver = new Resolver();
+  const cancel = () => resolver.cancel();
+  signal.addEventListener("abort", cancel, { once: true });
+  try {
+    const addresses = await metadataAddresses(url.hostname.replace(/^\[|\]$/g, ""), resolver, signal, proxyUrl);
+    signal.throwIfAborted();
+    return await new Promise((resolve, reject) => {
+      const req = pinnedHttpsRequest(url, addresses[0]!.address, signal,
+        { "ngrok-skip-browser-warning": "1", accept: "application/json", "accept-encoding": "identity" }, res => {
+          if (res.statusCode !== 200) { res.destroy(); reject(new PublicRouteError("http_error", `Public health returned HTTP ${res.statusCode}`)); return; }
+          let size = 0; const chunks: Buffer[] = [];
+          res.on("error", reject);
+          res.on("aborted", () => reject(new Error("Public health response interrupted")));
+          res.on("data", (chunk: Buffer) => {
+            size += chunk.length;
+            if (size > 16384) { res.destroy(); reject(new PublicRouteError("response_too_large", "Public health response exceeded limit")); }
+            else chunks.push(chunk);
+          });
+          res.on("end", () => resolve(new Response(Buffer.concat(chunks), {
+            headers: { "content-type": String(res.headers["content-type"] ?? "") }, status: 200,
+          })));
+        }, proxyUrl);
+      req.on("error", reject); req.end();
+    });
+  } finally { signal.removeEventListener("abort", cancel); }
+}
 
 export class PublicRouteError extends Error {
   constructor(readonly code: string, message: string) { super(message); this.name = "PublicRouteError"; }
@@ -24,12 +56,13 @@ async function abortable<T>(operation: () => Promise<T>, signal: AbortSignal): P
 
 /** An owned service nonce, not just HTTP 200 or a printed URL. No credentials
  * are sent. Redirects and unbounded bodies are refused. */
-export async function probePublicService(base: string, instanceId: string, signal?: AbortSignal): Promise<void> {
+export async function probePublicService(base: string, instanceId: string, signal?: AbortSignal, proxyUrl = ""): Promise<void> {
   try {
     const abort = AbortSignal.timeout(10000);
     const bounded = signal ? AbortSignal.any([signal, abort]) : abort;
     await abortable(async () => {
-      const response = await fetch(`${base}/healthz`, { redirect: "error", headers: { "ngrok-skip-browser-warning": "1" }, signal: bounded });
+      const response = proxyUrl ? await proxyHealth(new URL(`${base}/healthz`), bounded, proxyUrl)
+        : await fetch(`${base}/healthz`, { redirect: "error", headers: { "ngrok-skip-browser-warning": "1" }, signal: bounded });
       // Cancel unread bodies without awaiting cancellation-insensitive I/O.
       const cancelBody = () => { void response.body?.cancel().catch(() => {}); };
       if (bounded.aborted) { cancelBody(); bounded.throwIfAborted(); }
@@ -70,11 +103,11 @@ export async function probePublicService(base: string, instanceId: string, signa
     throw new PublicRouteError("network_error", `Public health connection failed${code}`);
   }
 }
-export async function waitForPublicService(base: string, instanceId: string, signal: AbortSignal, timeoutMs = 30000): Promise<void> {
+export async function waitForPublicService(base: string, instanceId: string, signal: AbortSignal, timeoutMs = 30000, proxyUrl = ""): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   const bounded = AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]);
   do {
-    try { await probePublicService(base, instanceId, bounded); return; }
+    try { await probePublicService(base, instanceId, bounded, proxyUrl); return; }
     catch { bounded.throwIfAborted(); }
     await delay(500, undefined, { signal: bounded });
   } while (Date.now() < deadline);

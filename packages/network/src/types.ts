@@ -22,10 +22,6 @@ export interface NetworkProvider {
   stop(force?: boolean): Promise<void>;
 }
 
-export interface ExternalProviderOptions {
-  readonly publicUrl: string;
-}
-
 export type CloudflareTunnelProtocol = "auto" | "http2" | "quic";
 
 export interface CloudflareProviderOptions {

@@ -53,7 +53,7 @@ export interface RuntimeSnapshot {
   readonly urlMode: string;
   readonly exitReason: string;
   readonly networkWarning?: string;
-  readonly networkProvider: "external" | "cloudflare" | "frp" | "ngrok" | "tailscale";
+  readonly networkProvider: "cloudflare" | "frp" | "ngrok" | "tailscale";
   readonly configuredPublicUrl: string;
   readonly enableShell: boolean;
   readonly oauthEnabled: boolean;
@@ -77,7 +77,7 @@ export interface RuntimeConfigurationUpdate {
   readonly oauthPassword: SecretUpdate;
   readonly rememberSecrets: boolean;
   readonly network: {
-    readonly provider: "external" | "cloudflare" | "frp" | "ngrok" | "tailscale";
+    readonly provider: "cloudflare" | "frp" | "ngrok" | "tailscale";
     readonly publicUrl: string;
     readonly options: Readonly<Record<string, string>>;
     readonly secretUpdates: Readonly<Record<string, SecretUpdate>>;
@@ -97,6 +97,7 @@ export interface RuntimeTool {
 }
 
 export interface RuntimeControl {
+  testOutboundProxy?(proxyUrl: string): Promise<{ ok: true }>;
   previewSkillImport?(path: string, replaceSourceId?: string): Promise<{
     path: string;
     candidates: readonly { id: string; name: string; description: string; path: string; status: "new" | "existing" | "conflict"; warnings: readonly string[] }[];

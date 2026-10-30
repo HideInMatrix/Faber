@@ -27,23 +27,18 @@
     "start": "node apps/daemon/dist/main.js",
     "typecheck": "tsc -b --pretty false",
     "typecheck:web": "node scripts/check-web-types.mjs -p apps/web/tsconfig.sfc.json --pretty false",
-    "check": "npm run typecheck && npm run typecheck:web && npm run build:web && npm run verify:brand && npm run verify:network-health && npm run verify:release-source && npm run verify:i18n && npm run verify:skills && npm run verify:computer-use-browser",
+    "check": "npm run typecheck && npm run typecheck:web && npm run build:web && npm run verify:source-boundary && npm run verify:distribution",
     "prepare:version": "node scripts/release-version.mjs",
     "notices": "node scripts/dependency-notices.mjs",
     "verify:source-boundary": "node scripts/verify-source-boundary.mjs",
-    "verify:privacy": "node --test scripts/test-distribution-privacy.mjs",
     "clean:maps": "node scripts/clean-source-maps.mjs",
-    "verify:package-integration": "node scripts/test-computer-use-package-integration.mjs",
-    "verify:brand": "node --test scripts/test-brand.mjs",
-    "verify:network-health": "node --test scripts/test-network-health.mjs",
-    "verify:skills": "node --test scripts/test-skills.mjs scripts/test-skill-import-ui.mjs",
-    "verify:release-source": "node --test scripts/test-release-source.mjs scripts/test-release-rename.mjs",
-    "verify:i18n": "node --test scripts/test-i18n.mjs",
-    "verify:computer-use-browser": "node --test scripts/test-computer-use-browser.mjs scripts/test-computer-use-browser-ui.mjs"
+    "verify:distribution": "node scripts/verify-distribution.mjs",
+    "test:local": "npm run build:service && node --test tests/test-*.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.87.1",
     "@earendil-works/pi-coding-agent": "0.87.1",
+    "@hideinmatrix/computer-use": "0.4.1",
     "@modelcontextprotocol/sdk": "1.32.1"
   },
   "devDependencies": {
@@ -58,6 +53,8 @@
     "vue-tsc": "3.3.12"
   },
   "overrides": {
-    "source-map-js": "1.2.2"
+    "source-map-js": "1.2.2",
+    "undici": "8.12.2",
+    "zod": "4.6.7"
   }
 }

@@ -30,7 +30,7 @@ export function assertComputerUsePackage(directory) {
     'binaries/x86_64-pc-windows-msvc/development/micromatrix-computer-x86_64-pc-windows-msvc.exe']
   for (const file of required) if (!files.includes(file)) throw new Error(`Computer Use package missing: ${file}`)
   const pkg = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8'))
-  if (pkg.name !== '@hideinmatrix/computer-use' || pkg.version !== '0.4.0'
+  if (pkg.name !== '@hideinmatrix/computer-use' || pkg.version !== '0.4.1'
     || pkg.repository?.url !== 'git+https://github.com/HideInMatrix/computer-use.git'
     || pkg.scripts || pkg.devDependencies
     || Object.keys(pkg.exports ?? {}).sort().join('|') !== '.|./package.json') {

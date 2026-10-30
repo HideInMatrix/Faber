@@ -1,5 +1,4 @@
 export { CloudflareNetworkProvider, parseCloudflareProtocol } from "./cloudflare.js";
-export { ExternalNetworkProvider } from "./external.js";
 export { FrpNetworkProvider } from "./frp.js";
 export { NgrokNetworkProvider } from "./ngrok.js";
 export { TailscaleNetworkProvider } from "./tailscale.js";
@@ -9,7 +8,6 @@ export {
   providerResult,
   type CloudflareProviderOptions,
   type CloudflareTunnelProtocol,
-  type ExternalProviderOptions,
   type FrpProviderOptions,
   type NgrokProviderOptions,
   type TailscaleProviderOptions,
@@ -19,3 +17,6 @@ export {
 } from "./types.js";
 
 export { probePublicService, waitForPublicService, NetworkHealthMonitor, PublicRouteError } from "./health.js";
+
+export { pinnedHttpsRequest, parseOutboundProxy } from "./outbound.js";
+export { metadataAddresses, isPublicMetadataAddress, isFakeMetadataAddress, PublicAddressError } from "./public-dns.js";

@@ -10,9 +10,8 @@ import { computerPermissionSnapshot, computerPermissionFailure } from "./compute
 import { computerUseHelperPath } from "./computer-use-host.js";
 import { McpHttpService } from "@micromatrix/mcp-server";
 import {
-  NetworkHealthMonitor, PublicRouteError, probePublicService, waitForPublicService, normalizeBaseUrl,
+  NetworkHealthMonitor, PublicRouteError, parseOutboundProxy, probePublicService, waitForPublicService, normalizeBaseUrl,
   CloudflareNetworkProvider,
-  ExternalNetworkProvider,
   FrpNetworkProvider,
   NgrokNetworkProvider,
   TailscaleNetworkProvider,
@@ -20,7 +19,7 @@ import {
   type NetworkProvider,
   type NetworkProviderResult,
 } from "@micromatrix/network";
-import { LocalOAuthServer } from "@micromatrix/oauth";
+import { LocalOAuthServer, CimdClientResolver } from "@micromatrix/oauth";
 import { PluginRegistry, parseExtensions, type ExtensionConfiguration, type McpConnectionConfig, type PluginLogger } from "@micromatrix/plugin-kit";
 import { PiBodyHost, createPiBodyExtension } from "@micromatrix/pi-body";
 import { createMcpExtension, McpConnection, McpAuthStore, type McpExtensionController, type McpOptions } from "@micromatrix/plugin-mcp";
@@ -134,6 +133,19 @@ export class RuntimeSupervisor implements RuntimeControl {
     this.#registry = this.#createRegistry(config);
   }
 
+  #outboundTest: { proxyUrl: string; work: Promise<{ ok: true }> } | undefined;
+  async testOutboundProxy(value: string): Promise<{ ok: true }> {
+    const proxyUrl = parseOutboundProxy(value);
+    if (this.#outboundTest) {
+      if (this.#outboundTest.proxyUrl !== proxyUrl) throw new Error("Another network connection test is in progress");
+      return this.#outboundTest.work;
+    }
+    const work = new CimdClientResolver(proxyUrl).resolve("https://chatgpt.com/oauth/client.json")
+      .then(() => ({ ok: true as const })).finally(() => { this.#outboundTest = undefined; });
+    this.#outboundTest = { proxyUrl, work };
+    return work;
+  }
+
   snapshot(): RuntimeSnapshot {
     return {
       runtimeId: "default",
@@ -233,12 +245,12 @@ export class RuntimeSupervisor implements RuntimeControl {
         startup.signal.throwIfAborted();
         if (startingFailure) throw startingFailure;
         service.setPublicBaseUrl(this.#network.publicBaseUrl);
-        try { await waitForPublicService(this.#network.publicBaseUrl, service.instanceId, startup.signal); }
+        try { await waitForPublicService(this.#network.publicBaseUrl, service.instanceId, startup.signal, 30000, this.#healthProxy()); }
         catch (error) { throw startingFailure ?? new Error("Tunnel address is not ready or does not reach this MCP instance", { cause: error }); }
         if (startingFailure) throw startingFailure;
         startup.signal.throwIfAborted();
         const publicBaseUrl = this.#network.publicBaseUrl;
-        this.#networkHealth = new NetworkHealthMonitor(signal => probePublicService(publicBaseUrl, service.instanceId, signal), () => {}, 30000, {
+        this.#networkHealth = new NetworkHealthMonitor(signal => probePublicService(publicBaseUrl, service.instanceId, signal, this.#healthProxy()), () => {}, 30000, {
           keepRunningOnFailure: true,
           onProbeResult: ({ ok, failures, error }) => {
             if (!this.#running) return;
@@ -366,6 +378,9 @@ export class RuntimeSupervisor implements RuntimeControl {
         if (value === undefined) delete mergedOptions[key];
         else mergedOptions[key] = value;
       }
+      mergedOptions.outbound_proxy = parseOutboundProxy(mergedOptions.outbound_proxy);
+      if (!["direct", "proxy"].includes(mergedOptions.health_route || "direct")) throw new Error("Invalid public health route");
+      if (mergedOptions.health_route === "proxy" && !mergedOptions.outbound_proxy) throw new Error("Public health proxy requires an outbound HTTP proxy URL");
       const candidate: DaemonConfig = {
         ...previous,
         name: update.name || "Faber Runtime",
@@ -622,6 +637,7 @@ export class RuntimeSupervisor implements RuntimeControl {
   #createService(config: DaemonConfig, registry: PluginRegistry): McpHttpService {
     const authorization = new LocalOAuthServer({
       password: config.oauthPassword,
+      outboundProxy: config.network.options.outbound_proxy || "",
       staticBearerToken: config.authToken,
     });
     return new McpHttpService({
@@ -639,7 +655,6 @@ export class RuntimeSupervisor implements RuntimeControl {
     const options = config.network.options;
     const executable = options.executable;
     switch (config.network.provider) {
-      case "external": return new ExternalNetworkProvider({ publicUrl: config.network.publicUrl ?? service.localBaseUrl });
       case "cloudflare": return new CloudflareNetworkProvider({
         executable: executable || defaultCloudflaredExecutable(),
         publicUrl: config.network.publicUrl,
@@ -663,17 +678,16 @@ export class RuntimeSupervisor implements RuntimeControl {
     }
   }
 
+  #healthProxy(): string {
+    return this.#config.network.options.health_route === "proxy" ? this.#config.network.options.outbound_proxy || "" : "";
+  }
+
   #assertSecuredExposure(): void {
-    const loopbackHost = this.#config.host === "localhost"
-      || this.#config.host === "::1"
-      || /^127\./.test(this.#config.host);
-    const localOnly = this.#config.network.provider === "external"
-      && loopbackHost
-      && (!this.#config.network.publicUrl || (() => { const u = new URL(this.#config.network.publicUrl!); return u.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname); })());
-    if (!localOnly && !this.#config.oauthPassword && !this.#config.authToken) {
+    if (!this.#config.oauthPassword && !this.#config.authToken) {
       throw new Error("Public tunnel exposure requires an OAuth password or MICROMATRIX_AUTH_TOKEN");
     }
   }
+
 }
 
 export function applySecretUpdate(current: string | undefined, update: SecretUpdate): string | undefined {

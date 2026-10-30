@@ -7,6 +7,6 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
-  "references": [{ "path": "../plugin-kit" }],
+  "references": [{ "path": "../network" }, { "path": "../plugin-kit" }],
   "include": ["src/**/*.ts"]
 }

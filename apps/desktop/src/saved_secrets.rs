@@ -25,7 +25,7 @@ pub fn read(file: &Path, env: &HashMap<String, String>) -> Result<SavedSecrets, 
     oauth_password: first(env, &["MICROMATRIX_OAUTH_PASSWORD"])
       .or_else(|| disk["oauthPassword"].as_str().map(str::to_owned)).unwrap_or_default(),
     provider: first(env, &["MICROMATRIX_NETWORK_PROVIDER", "AGENT_RUNTIME_NETWORK_PROVIDER"])
-      .or_else(|| disk["network"]["provider"].as_str().map(str::to_owned)).unwrap_or_else(|| "external".into()).to_lowercase(),
+      .or_else(|| disk["network"]["provider"].as_str().map(str::to_owned)).unwrap_or_else(|| "cloudflare".into()).to_lowercase(),
     options: HashMap::new(),
   };
   for (key, keys) in [

@@ -4,9 +4,10 @@ import { dirname, resolve } from "node:path";
 
 import type { ApprovalMode } from "@micromatrix/approval";
 import { parseExtensions, type ExtensionConfiguration } from "@micromatrix/plugin-kit";
+import { parseOutboundProxy } from "@micromatrix/network";
 import { builtinComputerUseConfiguration, type ComputerUseConfiguration } from "./builtin-computer-use.js";
 
-export type NetworkProviderKey = "external" | "cloudflare" | "frp" | "ngrok" | "tailscale";
+export type NetworkProviderKey = "cloudflare" | "frp" | "ngrok" | "tailscale";
 
 export interface DaemonConfig {
   readonly configFile: string;
@@ -42,7 +43,7 @@ interface SavedConfig {
   readonly plugins?: { readonly shell?: boolean };
   readonly extensions?: ExtensionConfiguration;
   readonly network?: {
-    readonly provider?: NetworkProviderKey;
+    readonly provider?: NetworkProviderKey | "external";
     readonly publicUrl?: string;
     readonly options?: Readonly<Record<string, string>>;
   };
@@ -79,15 +80,23 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
   const configFile = resolve(first(env, "MICROMATRIX_CONFIG_FILE") ?? `${homedir()}/.micromatrix-pi-mcp/runtime.json`);
   const disk = saved(configFile);
   const builtin = builtinComputerUseConfiguration(disk.computerUse, parseExtensions(disk.extensions));
-  const provider = (first(env, "MICROMATRIX_NETWORK_PROVIDER", "AGENT_RUNTIME_NETWORK_PROVIDER") ?? disk.network?.provider ?? "external").toLowerCase();
-  if (!["external", "cloudflare", "frp", "ngrok", "tailscale"].includes(provider)) throw new Error(`Unsupported network provider: ${provider}`);
+  const requestedProvider = first(env, "MICROMATRIX_NETWORK_PROVIDER", "AGENT_RUNTIME_NETWORK_PROVIDER");
+  // Removed External URL presets become an unstarted Quick Tunnel draft.
+  // Do not reuse its public URL, executable or stale provider credentials.
+  const migrateExternal = !requestedProvider && disk.network?.provider === "external";
+  const provider = (requestedProvider ?? (migrateExternal ? "cloudflare" : disk.network?.provider) ?? "cloudflare").toLowerCase();
+  if (!["cloudflare", "frp", "ngrok", "tailscale"].includes(provider)) throw new Error(`Unsupported network provider: ${provider}; choose cloudflare, ngrok, frp or tailscale`);
   const permissionMode = (first(env, "MICROMATRIX_PERMISSION_MODE") ?? disk.permissionMode ?? "safe") as ApprovalMode;
   if (!["safe", "trusted", "dangerous"].includes(permissionMode)) throw new Error(`Unsupported permission mode: ${permissionMode}`);
   const runtimePort = port(first(env, "MICROMATRIX_PORT", "AGENT_RUNTIME_PORT") ?? disk.port, "MICROMATRIX_PORT", 8234);
   const controlPort = port(first(env, "MICROMATRIX_CONTROL_PORT"), "MICROMATRIX_CONTROL_PORT", 8233);
   if (controlPort === runtimePort) throw new Error("MICROMATRIX_CONTROL_PORT must differ from MICROMATRIX_PORT");
 
-  const networkOptions: Record<string, string> = { ...(disk.network?.options ?? {}) };
+  const networkOptions: Record<string, string> = { ...(migrateExternal ? {} : disk.network?.options ?? {}) };
+  networkOptions.outbound_proxy = parseOutboundProxy(first(env, "MICROMATRIX_OUTBOUND_PROXY") ?? disk.network?.options?.outbound_proxy);
+  networkOptions.health_route = first(env, "MICROMATRIX_HEALTH_ROUTE") ?? disk.network?.options?.health_route ?? "direct";
+  if (!["direct", "proxy"].includes(networkOptions.health_route)) throw new Error("Invalid public health route");
+  if (networkOptions.health_route === "proxy" && !networkOptions.outbound_proxy) throw new Error("Public health proxy requires an outbound HTTP proxy URL");
   const optionEnv: Readonly<Record<string, string>> = {
     executable: first(env, "MICROMATRIX_TUNNEL_EXECUTABLE", "MICROMATRIX_CLOUDFLARED") ?? "",
     tunnel_token: first(env, "MICROMATRIX_TUNNEL_TOKEN", "AGENT_RUNTIME_TUNNEL_TOKEN") ?? "",
@@ -114,7 +123,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
     controlPort,
     network: {
       provider: provider as NetworkProviderKey,
-      publicUrl: first(env, "MICROMATRIX_PUBLIC_URL", "AGENT_RUNTIME_SERVER_URL") ?? disk.network?.publicUrl,
+      publicUrl: first(env, "MICROMATRIX_PUBLIC_URL", "AGENT_RUNTIME_SERVER_URL") ?? (migrateExternal ? undefined : disk.network?.publicUrl),
       options: networkOptions,
     },
   };

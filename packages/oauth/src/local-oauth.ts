@@ -102,7 +102,7 @@ function escapeHtml(value: string): string {
 
 export class LocalOAuthServer implements McpAuthorization {
   readonly #options: Required<Pick<LocalOAuthOptions, "accessTokenTtlSeconds" | "refreshTokenTtlSeconds">> & LocalOAuthOptions;
-  readonly #cimd = new CimdClientResolver();
+  readonly #cimd: CimdClientResolver;
   readonly #codes = new Map<string, AuthorizationCode>();
   readonly #accessTokens = new Map<string, TokenRecord>();
   readonly #refreshTokens = new Map<string, TokenRecord>();
@@ -115,6 +115,7 @@ export class LocalOAuthServer implements McpAuthorization {
   readonly #stateLimit: number;
 
   constructor(options: LocalOAuthOptions) {
+    this.#cimd = new CimdClientResolver(options.outboundProxy);
     this.#options = {
       ...options,
       accessTokenTtlSeconds: options.accessTokenTtlSeconds ?? 3_600,

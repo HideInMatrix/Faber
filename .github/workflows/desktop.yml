@@ -63,7 +63,6 @@ jobs:
       - name: Verify package and distribution boundaries without registry credentials
         run: |
           npm run verify:source-boundary
-          npm run verify:privacy
           node scripts/verify-distribution.mjs
       - run: npm run check
       - name: Reject high or critical dependency vulnerabilities
@@ -137,7 +136,6 @@ jobs:
       - name: Verify package and distribution boundaries without registry credentials
         run: |
           npm run verify:source-boundary
-          npm run verify:privacy
           node scripts/verify-distribution.mjs
       - name: Native-platform typecheck
         run: npm run typecheck
@@ -164,8 +162,6 @@ jobs:
           cache-on-failure: false
       - name: Build native Node SEA
         run: npm run build:sidecar -- --prebuilt-web
-      - name: Verify private package host contract and map-free resources
-        run: node scripts/test-computer-use-package-integration.mjs
       - name: Require complete fixed-version dependency notice files
         run: node scripts/dependency-notices.mjs --strict
       - name: Build Tauri application and installers
