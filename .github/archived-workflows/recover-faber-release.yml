@@ -36,8 +36,6 @@ jobs:
         with:
           node-version: '22.23.3'
           package-manager-cache: false
-      - name: Test bounded queries and recovery gates
-        run: node --test scripts/test-brand.mjs scripts/test-release-recovery.mjs
       - name: Verify original tag build and its successful native jobs
         id: source
         run: node scripts/recover-faber-release.mjs

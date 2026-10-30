@@ -19,7 +19,7 @@ Opening the app only loads settings. MCP and the tunnel run only after you click
 - **Web AI, local execution**: connect web AI reasoning to local files, commands, and tools through MCP, without deploying a local model.
 - **Computer Use**: built-in desktop and browser control lets AI operate your computer after you enable it and grant the required system permissions.
 - **Flexible extensions**: manage MCP services, Skills, and Pi plugins to assemble the tools each task needs.
-- **Multiple connection options**: use Cloudflare Tunnel, an external URL, or other network providers to connect compatible web MCP clients with OAuth authorization.
+- **Multiple connection options**: use Cloudflare Tunnel, ngrok, FRP, or Tailscale Funnel to connect compatible web MCP clients with OAuth authorization.
 - **Configurable approvals**: choose approval for each request, automatic file-change approval, or full access. You control when Runtime starts and stops, with status and logs available in the app.
 - **Ready to use, bilingual interface**: macOS and Windows installers bundle runtime dependencies, with Chinese/English switching, automatic update checks, and manual installation confirmation.
 
@@ -70,3 +70,21 @@ Only interface text is localized. Logs, third-party responses, and your input re
 ## Open-source acknowledgments
 
 - [Pi Agent](https://github.com/earendil-works/pi)
+
+### Network compatibility
+
+Set the outbound HTTP proxy in Runtime settings (for example, `http://127.0.0.1:7890`) and test the authorization connection before saving. An empty address uses direct connections. Proxy credentials and SOCKS URLs are not supported. The proxy applies to OAuth client metadata and validated public DNS, independently of the selected tunnel; no preload script or TUN is needed.
+
+Public health checks have a separate direct/proxy selection. They still verify this service instance. A successful proxy check does not prove reachability from every external network. Testing does not save settings or start a tunnel. Stop Runtime before changing its configuration.
+
+External URL has been removed. Existing presets load as an unstarted Cloudflare Quick Tunnel draft, clearing the former public URL and provider-specific options. The original file remains until settings are saved. Public tunnels still require an OAuth password or static token. Exit old compatibility-script instances and use the normal Faber launcher with the built-in proxy configuration.
+
+### Development directories
+
+- `scripts/`: build, packaging, publication and release validation tools.
+- `diagnostics/`: manually invoked troubleshooting tools and investigation notes.
+- `tests/`: local-only automated tests, ignored by Git. Test results and collected evidence are not committed either.
+
+`npm run check` runs type checks, the frontend build and distribution boundary validation without local test files. Developers who retain the local tests can use `npm run test:local`, which builds the service before running them. Fresh clones do not include the tests directory. CI retains build, release provenance, signing, distribution boundary and vulnerability checks, without running local-only tests.
+
+The root and `apps/daemon` pin the same Computer Use version so npm applies the Zod security override across workspace dependencies. Update both pins when upgrading the package; source boundary validation checks that they agree.

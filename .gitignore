@@ -29,3 +29,6 @@ vitest.config.*
 apps/desktop/binaries/
 apps/desktop/resources/notices/
 apps/desktop/resources/automation/
+
+# Local-only automated tests and generated evidence.
+/tests/

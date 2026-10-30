@@ -15,8 +15,8 @@ const targets = {
 }
 const allowedRepairs = new Set([
   '.github/workflows/desktop.yml', '.github/workflows/recover-faber-release.yml',
-  'scripts/replace-legacy-brand-release.mjs', 'scripts/test-brand.mjs',
-  'scripts/recover-faber-release.mjs', 'scripts/test-release-recovery.mjs',
+  'scripts/replace-legacy-brand-release.mjs',
+  'scripts/recover-faber-release.mjs',
   'scripts/publish-desktop-release.sh',
 ])
 export function validateRepairFiles(files) {
