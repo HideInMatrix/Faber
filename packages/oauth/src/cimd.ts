@@ -44,15 +44,6 @@ export function isPublicMetadataAddress(address: string): boolean {
     : family === 6 && globalV6.check(address, "ipv6") && !blocked.check(address, "ipv6");
 }
 
-const fakeIp = new BlockList();
-fakeIp.addSubnet("198.18.0.0", 15, "ipv4");
-// Fake-IP proxies also publish IPv4-translated AAAA records (RFC 6145).
-fakeIp.addSubnet("::ffff:0:c612:0", 111, "ipv6");
-export function isFakeMetadataAddress(address: string): boolean {
-  const family = isIP(address);
-  return family !== 0 && fakeIp.check(address, family === 4 ? "ipv4" : "ipv6");
-}
-
 /** Only bootstrap the fixed DNS provider, never the untrusted metadata host. */
 async function publicDns(host: string, type: "A" | "AAAA", signal: AbortSignal): Promise<{ address: string; family: number }[]> {
   const url = new URL("https://cloudflare-dns.com/dns-query");
@@ -111,19 +102,22 @@ async function metadataAddresses(host: string, resolver: Resolver, signal: Abort
     resolver.resolve4(host), resolver.resolve6(host),
   ])).flatMap((result, index) => result.status === "fulfilled" ? result.value.map(address => ({ address, family: index === 0 ? 4 : 6 })) : []);
   signal.throwIfAborted();
-  if (!addresses.length) throw new CimdDiscoveryError(503, "temporarily_unavailable", "CIMD metadata DNS lookup failed; check the desktop application's network/DNS settings");
-  if (addresses.every(({ address }) => isPublicMetadataAddress(address))) return addresses;
-  // A private/mixed-private DNS answer is still refused, never sent to DoH.
-  if (family || !addresses.some(({ address }) => isFakeMetadataAddress(address))
-    || addresses.some(({ address }) => !isPublicMetadataAddress(address) && !isFakeMetadataAddress(address))) {
+  if (addresses.length && addresses.every(({ address }) => isPublicMetadataAddress(address))) return addresses;
+  if (family) {
     throw new CimdDiscoveryError(400, "invalid_client_metadata", "CIMD DNS must resolve exclusively to public addresses; private or reserved targets are refused");
   }
+  // Local DNS can be intercepted, stale after a proxy change, or return a
+  // reserved AAAA alongside a fake/public A. Re-resolve the hostname through
+  // the fixed, TLS-verified public provider instead of dialing ANY local answer.
+  // This is not a private-address exception: publicDns validates every returned
+  // destination, and fetchDocument pins only the independently verified result.
+  const localAnswers = addresses.length ? addresses.slice(0, 8).map(({ address }) => address).join(", ") : "no answers";
   try {
     addresses = (await Promise.all([publicDns(host, "A", signal), publicDns(host, "AAAA", signal)])).flat();
     if (!addresses.length) throw new Error("No public DNS answers");
     return addresses;
   } catch {
-    throw new CimdDiscoveryError(503, "temporarily_unavailable", "CIMD DNS returned proxy fake-IP addresses and verified public DNS lookup failed; allow HTTPS to cloudflare-dns.com (1.1.1.1) or exclude the metadata domain from fake-IP DNS");
+    throw new CimdDiscoveryError(503, "temporarily_unavailable", `CIMD metadata DNS for ${host} returned unusable addresses (${localAnswers}); verified public DNS lookup failed; check DNS/proxy settings and allow HTTPS to cloudflare-dns.com (1.1.1.1)`);
   }
 }
 
