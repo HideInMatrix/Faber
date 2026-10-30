@@ -97,7 +97,6 @@ export interface RuntimeTool {
 }
 
 export interface RuntimeControl {
-  testOutboundProxy?(proxyUrl: string): Promise<{ ok: true }>;
   previewSkillImport?(path: string, replaceSourceId?: string): Promise<{
     path: string;
     candidates: readonly { id: string; name: string; description: string; path: string; status: "new" | "existing" | "conflict"; warnings: readonly string[] }[];

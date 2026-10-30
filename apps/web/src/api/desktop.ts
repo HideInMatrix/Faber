@@ -140,7 +140,6 @@ export const desktopApi = {
     if (isTauri()) await invoke('open_authorization_url', { url })
     else if (!window.open(url, '_blank', 'noopener,noreferrer')) throw new Error(t("浏览器拦截了授权窗口，请允许弹窗后重试。"))
   },
-  testOutboundProxy: (proxyUrl: string) => call<{ ok: true }>('test_outbound_proxy', proxyUrl),
   logs: (after = 0) => call<{ cursor: number; entries: LogEntryDto[] }>('get_logs', after),
   clearLogs: () => call<number>('clear_logs'),
   savedRuntimeSecrets: () => isTauri() ? invoke<SavedRuntimeSecrets>('runtime_saved_secrets') : Promise.resolve(null),

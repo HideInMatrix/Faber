@@ -71,13 +71,15 @@ Only interface text is localized. Logs, third-party responses, and your input re
 
 - [Pi Agent](https://github.com/earendil-works/pi)
 
-### Network compatibility
+### Networking and startup diagnostics
 
-Set the outbound HTTP proxy in Runtime settings (for example, `http://127.0.0.1:7890`) and test the authorization connection before saving. An empty address uses direct connections. Proxy credentials and SOCKS URLs are not supported. The proxy applies to OAuth client metadata and validated public DNS, independently of the selected tunnel; no preload script or TUN is needed.
+Faber no longer provides application-level HTTP proxy settings, proxy health routes or an authorization connection test. Tunnels, authorization metadata and public health checks use their respective default network paths. System routing and the user's proxy rules determine the actual egress. Enabling a system HTTP proxy does not guarantee that cloudflared or Node.js requests use it; configure routing and DNS rules in the proxy client when using TUN.
 
-Public health checks have a separate direct/proxy selection. They still verify this service instance. A successful proxy check does not prove reachability from every external network. Testing does not save settings or start a tunnel. Stop Runtime before changing its configuration.
+Startup errors identify the failed stage. Cloudflare diagnostics distinguish credential rejection, Fake-IP, DNS, certificate validation, TLS handshake and connectivity failures. HTTP/2 uses TCP 7844; QUIC uses UDP 7844. Check the selected protocol and its network path rather than treating one failed TCP/UDP pre-check as proof that both protocols are unavailable.
 
-External URL has been removed. Existing presets load as an unstarted Cloudflare Quick Tunnel draft, clearing the former public URL and provider-specific options. The original file remains until settings are saved. Public tunnels still require an OAuth password or static token. Exit old compatibility-script instances and use the normal Faber launcher with the built-in proxy configuration.
+A connected tunnel followed by failed public service validation points to a later stage: check the public domain, origin forwarding address and port, access policies, or an old service instance. Details are retained in runtime logs. Individual health checks still have a 10-second deadline, with a 30-second interval while running.
+
+Legacy `outbound_proxy`, `health_route` and their environment variables are ignored; saving removes the old fields. External URL remains removed. Old presets load as an unstarted Cloudflare Quick Tunnel draft, clearing their former public URL and provider-specific options without rewriting the original file until saved. Public tunnels still require an OAuth password or static token.
 
 ### Development directories
 

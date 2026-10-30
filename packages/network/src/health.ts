@@ -1,36 +1,4 @@
 import { setTimeout as delay } from "node:timers/promises";
-import { Resolver } from "node:dns/promises";
-import { metadataAddresses } from "./public-dns.js";
-import { pinnedHttpsRequest } from "./outbound.js";
-
-async function proxyHealth(url: URL, signal: AbortSignal, proxyUrl: string): Promise<Response> {
-  if (url.protocol !== "https:" || url.username || url.password) throw new Error("Proxy health checks require a public HTTPS URL");
-  const resolver = new Resolver();
-  const cancel = () => resolver.cancel();
-  signal.addEventListener("abort", cancel, { once: true });
-  try {
-    const addresses = await metadataAddresses(url.hostname.replace(/^\[|\]$/g, ""), resolver, signal, proxyUrl);
-    signal.throwIfAborted();
-    return await new Promise((resolve, reject) => {
-      const req = pinnedHttpsRequest(url, addresses[0]!.address, signal,
-        { "ngrok-skip-browser-warning": "1", accept: "application/json", "accept-encoding": "identity" }, res => {
-          if (res.statusCode !== 200) { res.destroy(); reject(new PublicRouteError("http_error", `Public health returned HTTP ${res.statusCode}`)); return; }
-          let size = 0; const chunks: Buffer[] = [];
-          res.on("error", reject);
-          res.on("aborted", () => reject(new Error("Public health response interrupted")));
-          res.on("data", (chunk: Buffer) => {
-            size += chunk.length;
-            if (size > 16384) { res.destroy(); reject(new PublicRouteError("response_too_large", "Public health response exceeded limit")); }
-            else chunks.push(chunk);
-          });
-          res.on("end", () => resolve(new Response(Buffer.concat(chunks), {
-            headers: { "content-type": String(res.headers["content-type"] ?? "") }, status: 200,
-          })));
-        }, proxyUrl);
-      req.on("error", reject); req.end();
-    });
-  } finally { signal.removeEventListener("abort", cancel); }
-}
 
 export class PublicRouteError extends Error {
   constructor(readonly code: string, message: string) { super(message); this.name = "PublicRouteError"; }
@@ -56,13 +24,12 @@ async function abortable<T>(operation: () => Promise<T>, signal: AbortSignal): P
 
 /** An owned service nonce, not just HTTP 200 or a printed URL. No credentials
  * are sent. Redirects and unbounded bodies are refused. */
-export async function probePublicService(base: string, instanceId: string, signal?: AbortSignal, proxyUrl = ""): Promise<void> {
+export async function probePublicService(base: string, instanceId: string, signal?: AbortSignal): Promise<void> {
   try {
     const abort = AbortSignal.timeout(10000);
     const bounded = signal ? AbortSignal.any([signal, abort]) : abort;
     await abortable(async () => {
-      const response = proxyUrl ? await proxyHealth(new URL(`${base}/healthz`), bounded, proxyUrl)
-        : await fetch(`${base}/healthz`, { redirect: "error", headers: { "ngrok-skip-browser-warning": "1" }, signal: bounded });
+      const response = await fetch(`${base}/healthz`, { redirect: "error", headers: { "ngrok-skip-browser-warning": "1" }, signal: bounded });
       // Cancel unread bodies without awaiting cancellation-insensitive I/O.
       const cancelBody = () => { void response.body?.cancel().catch(() => {}); };
       if (bounded.aborted) { cancelBody(); bounded.throwIfAborted(); }
@@ -103,15 +70,33 @@ export async function probePublicService(base: string, instanceId: string, signa
     throw new PublicRouteError("network_error", `Public health connection failed${code}`);
   }
 }
-export async function waitForPublicService(base: string, instanceId: string, signal: AbortSignal, timeoutMs = 30000, proxyUrl = ""): Promise<void> {
+export async function waitForPublicService(base: string, instanceId: string, signal: AbortSignal, timeoutMs = 30000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   const bounded = AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]);
+  let lastError: unknown;
   do {
-    try { await probePublicService(base, instanceId, bounded, proxyUrl); return; }
-    catch { bounded.throwIfAborted(); }
-    await delay(500, undefined, { signal: bounded });
+    try { await probePublicService(base, instanceId, bounded); return; }
+    catch (error) {
+      if (signal.aborted) throw signal.reason;
+      // A final deadline must not hide an earlier instance/HTTP/JSON error.
+      if (error instanceof PublicRouteError || lastError === undefined) lastError = error;
+      if (bounded.aborted) break;
+    }
+    try { await delay(500, undefined, { signal: bounded }); }
+    catch { if (signal.aborted) throw signal.reason; break; }
   } while (Date.now() < deadline);
-  throw new Error("Public route did not become reachable");
+  const code = lastError instanceof PublicRouteError ? lastError.code : "timeout";
+  const details: Readonly<Record<string, string>> = {
+    instance_mismatch: "公网域名指向其他服务实例。请检查隧道转发目标、公网域名绑定，以及是否仍有旧 Faber 实例运行。",
+    http_error: "公网地址返回了异常 HTTP 状态。请检查隧道的源站地址与端口是否指向当前本地 MCP 服务，并查看隧道日志。",
+    unexpected_content_type: "公网地址返回的不是服务健康检查 JSON，可能是错误页、登录页或其他网站。请检查域名绑定、访问策略和转发目标。",
+    invalid_json: "公网地址返回了无效的健康检查数据。请检查域名、反向代理及隧道转发目标。",
+    response_too_large: "公网地址返回的内容超过健康检查限制。请检查是否转发到了错误页面或其他服务。",
+    network_error: "本机无法连接公网健康检查地址。请检查该域名的 DNS、网络防火墙和代理/TUN 分流规则。",
+    timeout: "在启动等待期限内未能完成公网健康检查。请检查域名解析、隧道转发目标和本机到公网域名的网络路径。",
+  };
+  const observed = lastError instanceof PublicRouteError ? `\n检测结果：${lastError.message}` : "";
+  throw new Error(`隧道已连接，但公网服务验证失败：${details[code] ?? details.network_error}${observed}\n请到“运行日志”查看公网验证记录。`, { cause: lastError });
 }
 /** Serial probes, no overlap while running. Stop cancels the monitor without
  * waiting indefinitely for cancellation-insensitive network I/O to finish. */

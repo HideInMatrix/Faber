@@ -20,7 +20,6 @@ export interface McpAuthorization {
 }
 
 export interface LocalOAuthOptions {
-  readonly outboundProxy?: string;
   readonly publicOrigin?: string;
   readonly limits?: { readonly requestsPerMinute?: number; readonly loginAttemptsPerMinute?: number; readonly maxStateEntries?: number };
   readonly password: string | undefined;

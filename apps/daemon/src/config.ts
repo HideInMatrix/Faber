@@ -4,7 +4,6 @@ import { dirname, resolve } from "node:path";
 
 import type { ApprovalMode } from "@micromatrix/approval";
 import { parseExtensions, type ExtensionConfiguration } from "@micromatrix/plugin-kit";
-import { parseOutboundProxy } from "@micromatrix/network";
 import { builtinComputerUseConfiguration, type ComputerUseConfiguration } from "./builtin-computer-use.js";
 
 export type NetworkProviderKey = "cloudflare" | "frp" | "ngrok" | "tailscale";
@@ -93,10 +92,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
   if (controlPort === runtimePort) throw new Error("MICROMATRIX_CONTROL_PORT must differ from MICROMATRIX_PORT");
 
   const networkOptions: Record<string, string> = { ...(migrateExternal ? {} : disk.network?.options ?? {}) };
-  networkOptions.outbound_proxy = parseOutboundProxy(first(env, "MICROMATRIX_OUTBOUND_PROXY") ?? disk.network?.options?.outbound_proxy);
-  networkOptions.health_route = first(env, "MICROMATRIX_HEALTH_ROUTE") ?? disk.network?.options?.health_route ?? "direct";
-  if (!["direct", "proxy"].includes(networkOptions.health_route)) throw new Error("Invalid public health route");
-  if (networkOptions.health_route === "proxy" && !networkOptions.outbound_proxy) throw new Error("Public health proxy requires an outbound HTTP proxy URL");
+  // Ignore removed application-level proxy settings; saving drops them as well.
+  delete networkOptions.outbound_proxy;
+  delete networkOptions.health_route;
   const optionEnv: Readonly<Record<string, string>> = {
     executable: first(env, "MICROMATRIX_TUNNEL_EXECUTABLE", "MICROMATRIX_CLOUDFLARED") ?? "",
     tunnel_token: first(env, "MICROMATRIX_TUNNEL_TOKEN", "AGENT_RUNTIME_TUNNEL_TOKEN") ?? "",
@@ -131,7 +129,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
 
 export function saveConfig(config: DaemonConfig, rememberSecrets: boolean): void {
   const safeOptions = Object.fromEntries(Object.entries(config.network.options).filter(([key]) => (
-    rememberSecrets || !/token|secret|password|key/i.test(key)
+    !["outbound_proxy", "health_route"].includes(key) && (rememberSecrets || !/token|secret|password|key/i.test(key))
   )));
   const value: SavedConfig = {
     name: config.name,

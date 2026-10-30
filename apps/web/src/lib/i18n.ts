@@ -3,17 +3,6 @@ export const LOCALE_STORAGE_KEY = 'faber-interface-language'
 
 // Default/fallback messages stay Chinese. Raw logs and user content are not translated.
 export const englishMessages: Readonly<Record<string, string>> = {
-  "出站 HTTP 代理（可选）": "Outbound HTTP proxy (optional)",
-  "例如 http://127.0.0.1:7890。用于授权客户端元数据与公共 DNS 查询，不改变隧道连接；不支持带账号密码的代理。留空直连。": "For example, http://127.0.0.1:7890. Used for authorization metadata and public DNS, without changing tunnel connections. Authenticated proxies are not supported. Leave empty for direct connections.",
-  "公网探活连接方式": "Public health check connection",
-  "本机无法直连公网域名时可选择出站代理。代理探活仍校验目标服务身份，不代表所有外部客户端都能访问。": "Use the outbound proxy if this computer cannot reach the public URL directly. Health checks still verify the service identity; they do not establish connectivity for every external client.",
-  "直连": "Direct",
-  "使用出站代理": "Use outbound proxy",
-  "授权元数据连接成功；未启动隧道或保存配置。": "Authorization metadata connection succeeded. No tunnel was started or settings saved.",
-  "授权元数据连接失败：{value0}": "Authorization metadata connection failed: {value0}",
-  "测试中…": "Testing\u2026",
-  "测试授权连接": "Test authorization connection",
-  "使用当前填写的代理，仅测试 ChatGPT 授权元数据。": "Tests only ChatGPT authorization metadata using the proxy currently entered.",
   '浏览器连接方式': 'Browser connection mode',
   '托管独立窗口（无需 CDP）': 'Managed separate window (no CDP setup)',
   '附加现有 CDP 浏览器': 'Attach to an existing CDP browser',

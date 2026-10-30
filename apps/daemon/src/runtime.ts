@@ -10,7 +10,7 @@ import { computerPermissionSnapshot, computerPermissionFailure } from "./compute
 import { computerUseHelperPath } from "./computer-use-host.js";
 import { McpHttpService } from "@micromatrix/mcp-server";
 import {
-  NetworkHealthMonitor, PublicRouteError, parseOutboundProxy, probePublicService, waitForPublicService, normalizeBaseUrl,
+  NetworkHealthMonitor, PublicRouteError, probePublicService, waitForPublicService, normalizeBaseUrl,
   CloudflareNetworkProvider,
   FrpNetworkProvider,
   NgrokNetworkProvider,
@@ -19,7 +19,7 @@ import {
   type NetworkProvider,
   type NetworkProviderResult,
 } from "@micromatrix/network";
-import { LocalOAuthServer, CimdClientResolver } from "@micromatrix/oauth";
+import { LocalOAuthServer } from "@micromatrix/oauth";
 import { PluginRegistry, parseExtensions, type ExtensionConfiguration, type McpConnectionConfig, type PluginLogger } from "@micromatrix/plugin-kit";
 import { PiBodyHost, createPiBodyExtension } from "@micromatrix/pi-body";
 import { createMcpExtension, McpConnection, McpAuthStore, type McpExtensionController, type McpOptions } from "@micromatrix/plugin-mcp";
@@ -133,19 +133,6 @@ export class RuntimeSupervisor implements RuntimeControl {
     this.#registry = this.#createRegistry(config);
   }
 
-  #outboundTest: { proxyUrl: string; work: Promise<{ ok: true }> } | undefined;
-  async testOutboundProxy(value: string): Promise<{ ok: true }> {
-    const proxyUrl = parseOutboundProxy(value);
-    if (this.#outboundTest) {
-      if (this.#outboundTest.proxyUrl !== proxyUrl) throw new Error("Another network connection test is in progress");
-      return this.#outboundTest.work;
-    }
-    const work = new CimdClientResolver(proxyUrl).resolve("https://chatgpt.com/oauth/client.json")
-      .then(() => ({ ok: true as const })).finally(() => { this.#outboundTest = undefined; });
-    this.#outboundTest = { proxyUrl, work };
-    return work;
-  }
-
   snapshot(): RuntimeSnapshot {
     return {
       runtimeId: "default",
@@ -194,6 +181,7 @@ export class RuntimeSupervisor implements RuntimeControl {
       this.#exitReason = "";
       this.#networkWarning = "";
       const startup = new AbortController(); this.#startingAbort = startup;
+      let startupStage = "配置检查";
       try {
         const workspace = await stat(this.#config.workspace).catch(() => undefined);
         if (!workspace?.isDirectory()) throw new Error(`Workspace is not a directory: ${this.#config.workspace}`);
@@ -201,9 +189,11 @@ export class RuntimeSupervisor implements RuntimeControl {
         const preview = this.#service ?? this.#createService(this.#config, this.#registry);
         const provider = this.#provider ?? this.#createProvider(this.#config, preview);
         this.#provider = provider;
+        startupStage = "隧道程序检查";
         await provider.preflight?.();
         startup.signal.throwIfAborted();
         const context = { workspace: this.#config.workspace, logger: this.#logger };
+        startupStage = "加载 MCP 工具";
         const extensions = parseExtensions(this.#config.extensions);
         const builtin = this.computerUseStatus();
         if (builtin.enabled && builtin.conflict) throw new Error("Custom MCP ID computer_use conflicts with the built-in plugin");
@@ -229,10 +219,12 @@ export class RuntimeSupervisor implements RuntimeControl {
         this.#service = service;
         startup.signal.throwIfAborted();
         if (this.#config.network.publicUrl) service.setPublicBaseUrl(normalizeBaseUrl(this.#config.network.publicUrl));
+        startupStage = "启动本地 MCP 服务";
         await service.start();
         startup.signal.throwIfAborted();
         let startingFailure: Error | undefined;
         let starting = true;
+        startupStage = "建立公网隧道";
         this.#network = await provider.start({
           signal: startup.signal,
           localBaseUrl: service.localBaseUrl,
@@ -245,12 +237,13 @@ export class RuntimeSupervisor implements RuntimeControl {
         startup.signal.throwIfAborted();
         if (startingFailure) throw startingFailure;
         service.setPublicBaseUrl(this.#network.publicBaseUrl);
-        try { await waitForPublicService(this.#network.publicBaseUrl, service.instanceId, startup.signal, 30000, this.#healthProxy()); }
-        catch (error) { throw startingFailure ?? new Error("Tunnel address is not ready or does not reach this MCP instance", { cause: error }); }
+        startupStage = "验证公网服务";
+        try { await waitForPublicService(this.#network.publicBaseUrl, service.instanceId, startup.signal); }
+        catch (error) { throw startingFailure ?? error; }
         if (startingFailure) throw startingFailure;
         startup.signal.throwIfAborted();
         const publicBaseUrl = this.#network.publicBaseUrl;
-        this.#networkHealth = new NetworkHealthMonitor(signal => probePublicService(publicBaseUrl, service.instanceId, signal, this.#healthProxy()), () => {}, 30000, {
+        this.#networkHealth = new NetworkHealthMonitor(signal => probePublicService(publicBaseUrl, service.instanceId, signal), () => {}, 30000, {
           keepRunningOnFailure: true,
           onProbeResult: ({ ok, failures, error }) => {
             if (!this.#running) return;
@@ -285,8 +278,17 @@ export class RuntimeSupervisor implements RuntimeControl {
         this.#service = undefined;
         this.#network = undefined;
         this.#running = false;
-        this.#exitReason = error instanceof Error ? error.message : String(error);
-        throw error;
+        if (error instanceof Error && error.name === "AbortError") throw error;
+        const detail = error && typeof error === "object" && "code" in error && error.code === "EADDRINUSE"
+          ? `本地 MCP 端口 ${this.#config.port} 已被占用。请停止占用该端口的服务，或在 Runtime 设置中选择其他端口。`
+          : error instanceof Error ? error.message : String(error);
+        const failure = new Error(`启动失败 · ${startupStage}\n${detail}`, { cause: error });
+        this.#exitReason = failure.message;
+        this.#logger.log("error", "Runtime startup failed", {
+          stage: startupStage,
+          ...(["建立公网隧道", "验证公网服务"].includes(startupStage) ? { message: detail } : {}),
+        });
+        throw failure;
       } finally { if (this.#startingAbort === startup) this.#startingAbort = undefined; }
     });
   }
@@ -378,9 +380,8 @@ export class RuntimeSupervisor implements RuntimeControl {
         if (value === undefined) delete mergedOptions[key];
         else mergedOptions[key] = value;
       }
-      mergedOptions.outbound_proxy = parseOutboundProxy(mergedOptions.outbound_proxy);
-      if (!["direct", "proxy"].includes(mergedOptions.health_route || "direct")) throw new Error("Invalid public health route");
-      if (mergedOptions.health_route === "proxy" && !mergedOptions.outbound_proxy) throw new Error("Public health proxy requires an outbound HTTP proxy URL");
+      delete mergedOptions.outbound_proxy;
+      delete mergedOptions.health_route;
       const candidate: DaemonConfig = {
         ...previous,
         name: update.name || "Faber Runtime",
@@ -637,7 +638,6 @@ export class RuntimeSupervisor implements RuntimeControl {
   #createService(config: DaemonConfig, registry: PluginRegistry): McpHttpService {
     const authorization = new LocalOAuthServer({
       password: config.oauthPassword,
-      outboundProxy: config.network.options.outbound_proxy || "",
       staticBearerToken: config.authToken,
     });
     return new McpHttpService({
@@ -676,10 +676,6 @@ export class RuntimeSupervisor implements RuntimeControl {
         publicUrl: config.network.publicUrl ?? "",
       });
     }
-  }
-
-  #healthProxy(): string {
-    return this.#config.network.options.health_route === "proxy" ? this.#config.network.options.outbound_proxy || "" : "";
   }
 
   #assertSecuredExposure(): void {

@@ -16,7 +16,7 @@ const manager = useRuntimeManager()
         {{ manager.ready.value ? (manager.lifecycleAction.value === 'stop' ? t("停止中…") : manager.running.value ? (manager.runtime.value?.network_warning ? t("运行中 · 公网异常") : t("运行中")) : t("已停止")) : t("加载中") }}
       </span>
     </header>
-    <p v-if="manager.runtime.value?.exit_reason" role="alert" class="whitespace-pre-wrap text-xs text-destructive">{{ manager.runtime.value.exit_reason }}</p>
+    <p v-if="manager.runtime.value?.exit_reason" role="alert" class="rounded-lg border border-destructive/20 bg-destructive/5 p-3 whitespace-pre-wrap text-sm leading-6 text-destructive [overflow-wrap:anywhere]">{{ manager.runtime.value.exit_reason }}</p>
     <p v-if="manager.runtime.value?.network_warning" role="status" class="whitespace-pre-wrap text-xs text-muted-foreground">{{ manager.runtime.value.network_warning }}</p>
 
     <div v-if="!manager.ready.value" class="flex min-h-72 flex-col items-center justify-center gap-3 rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">

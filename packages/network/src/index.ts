@@ -17,6 +17,3 @@ export {
 } from "./types.js";
 
 export { probePublicService, waitForPublicService, NetworkHealthMonitor, PublicRouteError } from "./health.js";
-
-export { pinnedHttpsRequest, parseOutboundProxy } from "./outbound.js";
-export { metadataAddresses, isPublicMetadataAddress, isFakeMetadataAddress, PublicAddressError } from "./public-dns.js";

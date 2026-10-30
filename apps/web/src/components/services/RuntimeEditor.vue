@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { t } from '../../composables/useLocale'
 
-import { computed, ref } from 'vue'
-import { toast } from 'vue-sonner'
-import { desktopApi } from '../../api/desktop'
+import { computed } from 'vue'
 import { Check, Copy, Eye, EyeOff, FolderOpen, Play, RotateCcw, Square, Trash2 } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { CheckField, FormField, FormGrid } from '@/components/ui/form'
@@ -29,18 +27,6 @@ const props = defineProps<{
 const selectedProvider = computed(() => (
   props.networkProviders.find(item => item.key === draft.value.network.provider)
 ))
-
-const testingNetwork = ref(false)
-async function testNetwork() {
-  if (testingNetwork.value || props.locked) return
-  testingNetwork.value = true
-  try {
-    await desktopApi.testOutboundProxy(draft.value.network.options.outbound_proxy || '')
-    toast.success(t('授权元数据连接成功；未启动隧道或保存配置。'))
-  } catch (error) {
-    toast.error(t('授权元数据连接失败：{value0}', { value0: error instanceof Error ? error.message : String(error) }))
-  } finally { testingNetwork.value = false }
-}
 
 function secretConfigured(key: string) {
   return draft.value.network.configured_secrets.includes(key)
@@ -176,13 +162,6 @@ const emit = defineEmits<{
           <p class="mt-1 leading-5">{{ t(field.description) }}</p>
         </details>
       </FormField>
-
-      <div class="col-span-full flex items-center gap-3">
-        <Button variant="outline" size="sm" :disabled="locked || testingNetwork" @click="testNetwork">
-          {{ testingNetwork ? t('测试中…') : t('测试授权连接') }}
-        </Button>
-        <span class="text-xs text-muted-foreground">{{ t('使用当前填写的代理，仅测试 ChatGPT 授权元数据。') }}</span>
-      </div>
 
       <FormField :label="t('OAuth 密码')">
         <div class="grid gap-1.5">

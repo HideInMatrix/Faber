@@ -115,7 +115,7 @@ export class LocalOAuthServer implements McpAuthorization {
   readonly #stateLimit: number;
 
   constructor(options: LocalOAuthOptions) {
-    this.#cimd = new CimdClientResolver(options.outboundProxy);
+    this.#cimd = new CimdClientResolver();
     this.#options = {
       ...options,
       accessTokenTtlSeconds: options.accessTokenTtlSeconds ?? 3_600,

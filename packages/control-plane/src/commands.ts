@@ -64,13 +64,7 @@ function providerDefinitions(): ProviderDefinition[] {
         { key: "executable", label: "tailscale 路径（可选）", secret: false, span: "2" },
       ],
     },
-  ].map(provider => ({ ...provider, options: [...provider.options,
-    { key: "outbound_proxy", label: "出站 HTTP 代理（可选）", secret: false, span: "2",
-      description: "例如 http://127.0.0.1:7890。用于授权客户端元数据与公共 DNS 查询，不改变隧道连接；不支持带账号密码的代理。留空直连。" },
-    { key: "health_route", label: "公网探活连接方式", secret: false, span: "2", default_value: "direct",
-      description: "本机无法直连公网域名时可选择出站代理。代理探活仍校验目标服务身份，不代表所有外部客户端都能访问。",
-      choices: [{ value: "direct", label: "直连" }, { value: "proxy", label: "使用出站代理" }] },
-  ] }));
+  ];
 }
 
 function runtimeDto(runtime: RuntimeSnapshot) {
@@ -163,12 +157,6 @@ export class DesktopCommandRouter {
         };
       case "get_app_version": return this.#options.version;
       case "get_runtime": return runtimeView;
-      case "test_outbound_proxy": {
-        if (!this.#options.runtime.testOutboundProxy) throw new Error("Network test unavailable");
-        const value = request.args[0];
-        if (typeof value !== "string") throw new Error("Outbound proxy URL must be a string");
-        return this.#options.runtime.testOutboundProxy(value);
-      }
       case "configure_runtime": {
         await this.#options.runtime.configure(this.#configuration(request.args[0]));
         return runtimeDto(this.#options.runtime.snapshot());
