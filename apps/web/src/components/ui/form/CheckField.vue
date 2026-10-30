@@ -11,7 +11,7 @@ const props = defineProps<{
 <template>
   <label
     :class="cn(
-      'flex items-start gap-2 text-[11px] leading-[17px] text-muted-foreground [&>input]:mt-0.5',
+      'flex items-start gap-2 text-xs leading-5 text-muted-foreground [&>input]:mt-1',
       props.span === '2' && 'col-span-2',
       props.class,
     )"

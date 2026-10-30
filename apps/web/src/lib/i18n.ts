@@ -3,6 +3,16 @@ export const LOCALE_STORAGE_KEY = 'faber-interface-language'
 
 // Default/fallback messages stay Chinese. Raw logs and user content are not translated.
 export const englishMessages: Readonly<Record<string, string>> = {
+  '跳转到主内容': 'Skip to main content',
+  '基础配置': 'General',
+  '输出': 'Output',
+  '软件更新': 'Software updates',
+  '网络连接': 'Network',
+  '访问控制': 'Access control',
+  '连接与运行': 'Connection and runtime',
+  '连接地址': 'Connection URL',
+  '复制 MCP 地址': 'Copy MCP URL',
+  '启动后显示连接地址': 'Available after starting Runtime',
   '浏览器连接方式': 'Browser connection mode',
   '托管独立窗口（无需 CDP）': 'Managed separate window (no CDP setup)',
   '附加现有 CDP 浏览器': 'Attach to an existing CDP browser',
@@ -103,6 +113,9 @@ export const englishMessages: Readonly<Record<string, string>> = {
   '刷新工具': 'Refresh tools',
   '刷新文档': 'Refresh documents',
   '加载中': 'Loading',
+  '加载失败': 'Loading failed',
+  '启动中…': 'Starting…',
+  '运行异常': 'Runtime error',
   '原生 helper 缺失或系统不支持，请安装完整的桌面包。': 'The native helper is missing or the platform is unsupported. Install the complete desktop package.',
   '参数 JSON 数组': 'Arguments (JSON array)',
   '发现新版本 {value0}，可在“关于”中手动更新。': 'Version {value0} is available. Open About to update manually.',

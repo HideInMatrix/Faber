@@ -1,25 +1,35 @@
 <script setup lang="ts">
 import { t } from '../composables/useLocale'
+import { computed } from 'vue'
+import { runtimeStatus } from '../lib/runtime-status'
 
 import RuntimeEditor from './services/RuntimeEditor.vue'
 import { useRuntimeManager } from '../composables/useRuntimeManager'
 import { Button } from '@/components/ui/button'
 
 const manager = useRuntimeManager()
+const status = computed(() => runtimeStatus({
+  ready: manager.ready.value,
+  initializationError: manager.initializationError.value,
+  lifecycleAction: manager.lifecycleAction.value,
+  running: manager.running.value,
+  networkWarning: manager.runtime.value?.network_warning ?? '',
+  exitReason: manager.runtime.value?.exit_reason ?? '',
+}))
 </script>
 
 <template>
-  <section class="grid w-full max-w-[840px] gap-5">
-    <header class="flex min-h-8 items-center justify-between gap-4">
-      <h1 class="m-0 text-xl leading-7 font-medium tracking-[-0.02em]">Runtime</h1>
-      <span role="status" :class="['rounded-full px-2.5 py-1 text-xs font-medium', manager.running.value ? 'bg-success/10 text-success' : 'bg-secondary text-muted-foreground']">
-        {{ manager.ready.value ? (manager.lifecycleAction.value === 'stop' ? t("停止中…") : manager.running.value ? (manager.runtime.value?.network_warning ? t("运行中 · 公网异常") : t("运行中")) : t("已停止")) : t("加载中") }}
+  <section class="page-view runtime-page">
+    <header class="page-header">
+      <h1 class="page-title">Runtime</h1>
+      <span role="status" :class="['status-badge', `status-${status.tone}`]">
+        {{ t(status.label) }}
       </span>
     </header>
-    <p v-if="manager.runtime.value?.exit_reason" role="alert" class="whitespace-pre-wrap text-xs text-destructive">{{ manager.runtime.value.exit_reason }}</p>
-    <p v-if="manager.runtime.value?.network_warning" role="status" class="whitespace-pre-wrap text-xs text-muted-foreground">{{ manager.runtime.value.network_warning }}</p>
+    <p v-if="manager.runtime.value?.exit_reason" role="alert" class="runtime-notice runtime-notice-error">{{ manager.runtime.value.exit_reason }}</p>
+    <p v-if="manager.runtime.value?.network_warning" role="status" class="runtime-notice runtime-notice-warning">{{ manager.runtime.value.network_warning }}</p>
 
-    <div v-if="!manager.ready.value" class="flex min-h-72 flex-col items-center justify-center gap-3 rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">
+    <div v-if="!manager.ready.value" class="settings-panel runtime-loading">
       <template v-if="manager.initializationError.value">
         <p role="alert" class="max-w-xl whitespace-pre-wrap text-center text-destructive">{{ manager.initializationError.value }}</p>
         <p>{{ t("Runtime 与 Tunnel 尚未启动。") }}</p>

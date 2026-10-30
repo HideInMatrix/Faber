@@ -50,16 +50,15 @@ onBeforeUnmount(() => window.clearInterval(pollTimer))
 </script>
 
 <template>
-  <section class="grid w-full gap-5">
-    <header class="flex min-h-8 items-center justify-between gap-4">
+  <section class="page-view logs-page">
+    <header class="page-header">
       <div>
-        <h1 class="m-0 text-xl leading-7 font-medium tracking-[-0.02em]">{{ t("运行日志") }}</h1>
-        <p class="mt-[3px] mb-0 text-xs leading-[18px] text-muted-foreground">{{ t("查看 MCP Server 与网络提供商的实时运行输出。") }}</p>
+        <h1 class="page-title">{{ t("运行日志") }}</h1>
       </div>
       <Button
         variant="outline"
         size="sm"
-        class="text-destructive hover:bg-destructive/10 hover:text-destructive"
+        class="clear-logs-button"
         :disabled="clearing || logs.length === 0"
         @click="clearLogs"
       >

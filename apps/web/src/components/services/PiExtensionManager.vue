@@ -49,7 +49,7 @@ async function oauth(id: string) {
     toast.success(t("请在浏览器完成授权；授权完成后点击 Runtime 启动。"))
   })
 }
-const fieldClass = 'mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-xs outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50'
+const fieldClass = 'extension-input mt-2 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50'
 
 function newConnection(): PiMcpConnectionDto {
   return { id: '', name: '', enabled: true, transport: 'stdio', command: '', args: [], url: '', envRefs: {}, headers: {}, auth: 'none' }
@@ -160,17 +160,18 @@ defineExpose({ refresh: () => action(async () => {}) })
 </script>
 
 <template>
-  <section class="mt-6">
-    <div class="flex items-center justify-between gap-3">
-      <h2 class="m-0 text-sm font-medium">{{ t("MCP 服务") }}</h2>
+  <section :class="['extension-sections', { 'is-editing': form !== '' }]">
+    <section class="settings-panel extension-group" aria-labelledby="mcp-services-title">
+    <div class="extension-group-heading">
+      <h2 id="mcp-services-title">{{ t("MCP 服务") }}</h2>
       <div class="flex gap-2">
         <Button size="sm" variant="outline" :disabled="busy || !state || state.running" @click="editConnection()">{{ t("添加 MCP") }}</Button>
       </div>
     </div>
-    <div v-if="form === 'mcp'" class="mt-3 rounded-xl border border-border bg-card p-4">
-      <fieldset :disabled="busy || !state || state.running" class="space-y-3 disabled:opacity-60">
+    <div v-if="form === 'mcp'" class="extension-editor mt-4 rounded-xl border border-border bg-card p-4">
+      <fieldset :disabled="busy || !state || state.running" class="space-y-4 disabled:opacity-60">
           <h3 class="m-0 text-sm font-medium">{{ t(editingId ? '编辑 MCP 服务' : '添加 MCP 服务') }}</h3>
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-2 gap-4">
             <label class="text-xs">ID<input v-model="mcp.id" :class="fieldClass" placeholder="docs_mcp" :disabled="Boolean(editingId)" /></label>
             <label class="text-xs">{{ t("名称") }}<input v-model="mcp.name" :class="fieldClass" :placeholder="t('文档服务')" /></label>
           </div>
@@ -193,7 +194,7 @@ defineExpose({ refresh: () => action(async () => {}) })
             </template>
             <label class="block text-xs">{{ t("Header 引用 JSON") }}<textarea v-model="headersText" :class="[fieldClass, 'h-20 py-2 font-mono']" placeholder='{"Authorization":"Bearer ${MY_TOKEN}"}' /></label>
           </template>
-          <div v-if="credentialKeys.length" class="space-y-2 rounded-lg border border-border p-3">
+          <div v-if="credentialKeys.length" class="space-y-2 rounded-lg border border-border p-4">
             <p class="text-xs leading-5 text-muted-foreground">{{ t("留空保留，清除删除。启用本机保存后写入本地文件，非系统钥匙串。") }}</p>
             <div v-for="key in credentialKeys" :key="key" class="flex items-end gap-2">
               <label class="flex-1 text-xs">{{ key }} {{ configuredKeys.includes(key) ? t("· 已配置") : '' }}<input :value="credentials[key] ?? ''" type="password" autocomplete="off" :class="fieldClass" :placeholder="t('留空保留 / 使用服务环境变量')" @input="credentials[key] = ($event.target as HTMLInputElement).value" /></label>
@@ -203,9 +204,9 @@ defineExpose({ refresh: () => action(async () => {}) })
           <div class="flex justify-end gap-2"><Button size="sm" variant="outline" @click="form = ''">{{ t("取消") }}</Button><Button size="sm" variant="outline" @click="testMcp">{{ t("测试连接") }}</Button><Button size="sm" @click="saveMcp">{{ t("保存") }}</Button></div>
       </fieldset>
     </div>
-    <div v-if="state" class="mt-3 divide-y divide-border rounded-xl border border-border bg-card">
-      <div v-for="connection in state.configuration.mcp" :key="`mcp:${connection.id}`" class="flex flex-wrap items-center gap-2 px-4 py-3">
-        <div class="min-w-0 basis-40 flex-1"><div class="text-sm font-medium">{{ connection.name }}</div><div class="mt-1 truncate text-xs text-muted-foreground">MCP · {{ connection.id }} · {{ connection.transport }} · {{ connection.url || connection.command }}</div></div>
+    <div v-if="state" class="extension-list">
+      <div v-for="connection in state.configuration.mcp" :key="`mcp:${connection.id}`" class="extension-row">
+        <div class="extension-identity"><div class="text-sm font-medium">{{ connection.name }}</div><div class="mt-1 truncate text-xs text-muted-foreground" :title="connection.url || connection.command">MCP · {{ connection.id }} · {{ connection.transport }} · {{ connection.url || connection.command }}</div></div>
         <div class="text-xs text-muted-foreground">{{ state.mcp_status?.[connection.id]?.status ?? 'stopped' }}<span v-if="connection.auth === 'oauth'"> · OAuth {{ state.mcp_status?.[connection.id]?.oauth ?? 'logged_out' }}</span><div>{{ state.mcp_status?.[connection.id]?.message }}</div></div>
         <Button v-if="state.running && connection.enabled" size="sm" variant="ghost" :disabled="busy" @click="refreshTools(connection.id)">{{ t("刷新工具") }}</Button>
         <template v-if="connection.auth === 'oauth'">
@@ -219,12 +220,14 @@ defineExpose({ refresh: () => action(async () => {}) })
       </div>
       <div v-if="!state.configuration.mcp.length" class="px-4 py-5 text-center text-xs text-muted-foreground">{{ t("暂无外部 MCP 服务") }}</div>
     </div>
-    <div class="mt-6 flex items-center justify-between gap-3">
-      <h2 class="m-0 text-sm font-medium">Skills</h2>
+    </section>
+    <section class="settings-panel extension-group" aria-labelledby="skills-title">
+    <div class="extension-group-heading">
+      <h2 id="skills-title">Skills</h2>
       <Button size="sm" variant="outline" :disabled="busy || !state || state.running" @click="openSkillImport()">{{ t("添加 Skill") }}</Button>
     </div>
-    <div v-if="form === 'skill'" class="mt-3 rounded-xl border border-border bg-card p-4">
-      <fieldset :disabled="busy || !state || state.running" class="space-y-3 disabled:opacity-60">
+    <div v-if="form === 'skill'" class="extension-editor mt-4 rounded-xl border border-border bg-card p-4">
+      <fieldset :disabled="busy || !state || state.running" class="space-y-4 disabled:opacity-60">
           <h3 class="m-0 text-sm font-medium">{{ t("添加标准 Pi Skill") }}</h3>
           <label class="block text-xs">{{ t("方式") }}<select v-model="skillMode" :disabled="Boolean(replacingSkillSource)" :class="fieldClass"><option value="import">{{ t("导入本地 Skill 目录 / SKILL.md") }}</option><option value="create">{{ t("创建 SKILL.md") }}</option></select></label>
           <div v-if="skillMode === 'import'">
@@ -232,8 +235,8 @@ defineExpose({ refresh: () => action(async () => {}) })
             <p class="mt-2 text-xs text-muted-foreground">{{ t("仅引用原目录，不复制或删除文件。") }}</p>
             <p class="mt-2 text-xs text-muted-foreground">{{ t("扫描后按文件夹名生成独立配置；Skill 名称仍取自文档，每项可单独启停和移除。") }}</p>
             <p v-if="replacingSkillSource" class="mt-2 text-xs text-muted-foreground">{{ t("确认添加后将替换原目录引用；未选中的 Skill 不再由该来源加载，取消则保持原配置。") }}</p>
-            <Button class="mt-3" size="sm" variant="outline" :disabled="!skillPath.trim()" @click="scanSkills">{{ t("扫描目录") }}</Button>
-            <div v-if="skillPreview" class="mt-3 space-y-3 rounded-lg border border-border p-3">
+            <Button class="mt-4" size="sm" variant="outline" :disabled="!skillPath.trim()" @click="scanSkills">{{ t("扫描目录") }}</Button>
+            <div v-if="skillPreview" class="mt-4 space-y-4 rounded-lg border border-border p-4">
               <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
                 <span>{{ t("发现 {value0} 个 Skill，已选择 {value1} 个。", { value0: skillPreview.candidates.length, value1: selectedSkills.length }) }}</span>
                 <div class="flex gap-2"><Button size="sm" variant="ghost" @click="selectAllSkills">{{ t("全选可添加项") }}</Button><Button size="sm" variant="ghost" @click="selectedSkills = []">{{ t("取消全选") }}</Button></div>
@@ -241,7 +244,7 @@ defineExpose({ refresh: () => action(async () => {}) })
               <p v-if="!skillPreview.candidates.length" class="text-xs text-muted-foreground">{{ t("未发现可加载的 Skill，请检查 SKILL.md 和描述字段。") }}</p>
               <p v-if="newSkillCandidates.length > skillImportCapacity" class="text-xs text-muted-foreground">{{ t("最多保留 100 个独立配置，本次还能添加 {value0} 个。", { value0: skillImportCapacity }) }}</p>
               <div class="max-h-80 space-y-2 overflow-y-auto">
-                <label v-for="candidate in skillPreview.candidates" :key="candidate.path" class="flex items-start gap-3 rounded-lg border border-border p-3 text-xs">
+                <label v-for="candidate in skillPreview.candidates" :key="candidate.path" class="flex items-start gap-4 rounded-lg border border-border p-4 text-xs">
                   <input v-model="selectedSkills" type="checkbox" :value="candidate.path" :aria-label="t('选择 Skill {value0}', { value0: candidate.id })" :disabled="candidate.status !== 'new' || (!selectedSkills.includes(candidate.path) && selectedSkills.length >= skillImportCapacity)" />
                   <div class="min-w-0 flex-1 space-y-1">
                     <div class="font-medium">{{ candidate.id }} <span class="font-normal text-muted-foreground">{{ candidate.name }}</span></div>
@@ -263,21 +266,22 @@ defineExpose({ refresh: () => action(async () => {}) })
           <div class="flex justify-end gap-2"><Button size="sm" variant="outline" @click="form = ''">{{ t("取消") }}</Button><Button size="sm" :disabled="skillMode === 'import' && (!skillPreview || !selectedSkills.length)" @click="saveSkill">{{ skillMode === 'import' ? t('添加所选 Skill') : t('添加') }}</Button></div>
       </fieldset>
     </div>
-    <div v-if="state" class="mt-3 divide-y divide-border rounded-xl border border-border bg-card">
-      <div v-for="source in state.configuration.skills" :key="`skill:${source.id}`" class="flex flex-wrap items-center gap-2 px-4 py-3">
-        <div class="min-w-0 basis-40 flex-1"><div class="text-sm font-medium">{{ source.id }}</div><div class="mt-1 truncate text-xs text-muted-foreground">{{ t("Skill 来源 ·") }} {{ source.path }}</div></div>
+    <div v-if="state" class="extension-list">
+      <div v-for="source in state.configuration.skills" :key="`skill:${source.id}`" class="extension-row">
+        <div class="extension-identity"><div class="text-sm font-medium">{{ source.id }}</div><div class="mt-1 truncate text-xs text-muted-foreground" :title="source.path">{{ t("Skill 来源 ·") }} {{ source.path }}</div></div>
         <Button v-if="!source.path.toLowerCase().endsWith('.md')" size="sm" variant="ghost" :disabled="busy || state.running" @click="openSkillImport(source)">{{ t("拆分目录") }}</Button>
         <Button size="sm" variant="ghost" :disabled="busy || state.running" @click="remove('skills', source.id)">{{ t("移除引用") }}</Button>
         <Switch :model-value="source.enabled" :disabled="busy || state.running" :aria-label="t('启停 Skill 来源 {value0}', { value0: source.id })" @update:model-value="value => changeEnabled('skills', source.id, value)" />
       </div>
       <div v-if="!state.configuration.skills.length" class="px-4 py-5 text-center text-xs text-muted-foreground">{{ t("暂无 Skills") }}</div>
     </div>
-    <div v-if="state?.skill_diagnostics?.length" class="mt-3 rounded-xl border border-border bg-card p-4 text-xs" role="status">
+    <div v-if="state?.skill_diagnostics?.length" class="mt-4 rounded-xl border border-border bg-card p-4 text-xs" role="status">
       <h3 class="m-0 font-medium">{{ t("Skill 导入警告（不阻止其他文档加载）") }}</h3>
       <div v-for="diagnostic in state.skill_diagnostics" :key="`${diagnostic.path}:${diagnostic.message}`" class="mt-2 break-all text-muted-foreground">
         <div>{{ diagnostic.path }}</div><div>{{ diagnostic.message }}</div>
       </div>
     </div>
+    </section>
     <PiSkillEditor v-if="state && state.configuration.skills.length" :key="JSON.stringify(state.configuration.skills)" :running="state.running" @changed="emit('changed')" />
   </section>
 </template>

@@ -15,8 +15,8 @@ export const buttonVariants = cva(
         destructiveOutline: 'border border-destructive/30 bg-transparent text-destructive hover:bg-destructive/10',
       },
       size: {
-        default: 'h-9 px-4 py-2',
-        sm: 'h-8 rounded-md px-3 text-xs',
+        default: 'h-10 px-4 py-2',
+        sm: 'h-9 rounded-md px-3 text-xs',
         lg: 'h-10 rounded-md px-6',
         icon: 'size-9',
       },

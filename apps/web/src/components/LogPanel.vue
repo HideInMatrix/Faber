@@ -1,17 +1,16 @@
 <script setup lang="ts">
 import { t } from '../composables/useLocale'
 
+import { Terminal } from '@lucide/vue'
 import type { LogEntryDto } from '../types'
 
 defineProps<{ logs: LogEntryDto[] }>()
 </script>
 
 <template>
-  <section class="m-0 overflow-hidden rounded-lg border border-border bg-popover shadow-sm">
-    <div class="flex min-h-11 items-center justify-between border-b border-border px-3.5 text-[11px]">
-      <strong class="font-medium">{{ t("运行日志") }}</strong>
-      <span class="text-muted-foreground">{{ t('共 {count} 条', { count: logs.length }) }}</span>
-    </div>
-    <pre class="m-0 min-h-[280px] max-h-[calc(100vh-190px)] cursor-text select-text overflow-auto bg-[oklch(0.16_0_0)] px-4 py-3.5 font-mono text-[11px] leading-[1.65] text-[oklch(0.86_0_0)]"><template v-if="logs.length"><span v-for="item in logs" :key="item.id" class="block select-text">{{ item.message }}</span></template><span v-else class="select-text">{{ t("暂无运行日志") }}</span></pre>
+  <section class="log-panel" :aria-label="t('运行日志')">
+    <div class="log-toolbar"><span class="log-toolbar-title"><Terminal :size="16" /><strong>{{ t("输出") }}</strong></span><span>{{ t('共 {count} 条', { count: logs.length }) }}</span></div>
+    <pre v-if="logs.length" class="log-output"><span v-for="item in logs" :key="item.id" class="log-line">{{ item.message }}</span></pre>
+    <div v-else class="log-empty"><Terminal :size="32" :stroke-width="1.3" /><p>{{ t("暂无运行日志") }}</p></div>
   </section>
 </template>

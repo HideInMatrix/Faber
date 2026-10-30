@@ -42,6 +42,6 @@ const descriptions: Record<RuntimeDraft['permission_mode'], string> = {
         {{ t(option.label) }}
       </option>
     </select>
-    <p class="mt-1.5 mb-0 text-xs leading-5 text-muted-foreground">{{ t(descriptions[mode]) }}</p>
+    <p class="mt-2 mb-0 text-xs leading-5 text-muted-foreground">{{ t(descriptions[mode]) }}</p>
   </FormField>
 </template>

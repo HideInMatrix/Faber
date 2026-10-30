@@ -6,7 +6,7 @@ const props = defineProps<{ class?: HTMLAttributes['class'] }>()
 </script>
 
 <template>
-  <div :class="cn('grid grid-cols-2 gap-3', props.class)">
+  <div :class="cn('form-grid grid grid-cols-2 gap-4', props.class)">
     <slot />
   </div>
 </template>

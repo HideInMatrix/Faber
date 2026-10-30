@@ -69,26 +69,28 @@ onMounted(refresh)
 </script>
 
 <template>
-  <section class="flex w-full max-w-[840px] flex-1 flex-col pb-8">
-    <header class="flex min-h-8 items-center justify-between gap-4">
+  <section class="page-view plugins-page">
+    <header class="page-header">
       <div>
-        <h1 class="m-0 text-xl leading-7 font-medium tracking-[-0.02em]">{{ t("插件") }}</h1>
+        <h1 class="page-title">{{ t("插件") }}</h1>
       </div>
-      <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="busy" :title="t('刷新')" @click="refreshAll">
+      <Button variant="outline" size="sm" :disabled="busy" :aria-label="t('刷新')" @click="refreshAll">
         <RefreshCw :size="15" />
+        {{ t("刷新") }}
       </Button>
     </header>
 
-    <section class="mt-6">
-      <div class="mb-3 flex items-center justify-between gap-3">
-        <h2 class="m-0 text-sm font-medium">{{ t("内置工具") }}</h2>
+    <div class="plugins-overview">
+    <section class="settings-panel plugin-tools-section" aria-labelledby="builtin-tools-title">
+      <div class="plugin-section-heading">
+        <h2 id="builtin-tools-title"><span class="section-icon"><Box :size="18" /></span>{{ t("内置工具") }}</h2>
         <span v-if="runtimeRunning" class="text-xs text-muted-foreground">{{ t("运行中 · 设置已锁定") }}</span>
       </div>
-      <div class="overflow-hidden rounded-xl border border-border bg-card">
-        <div v-for="plugin in plugins" :key="plugin.id" class="flex min-h-14 items-center gap-3 border-b border-border px-4 last:border-b-0">
+      <div class="tool-list">
+        <div v-for="plugin in plugins" :key="plugin.id" class="tool-list-row">
           <div class="grid size-8 flex-none place-items-center rounded-lg border border-border bg-background"><Box :size="15" /></div>
           <div class="min-w-0 flex-1">
-            <div class="text-xs font-medium">{{ plugin.name }}</div>
+            <div class="text-sm font-medium">{{ plugin.name }}</div>
             <div v-if="plugin.required" class="mt-0.5 text-xs text-muted-foreground">{{ t("必需") }}</div>
           </div>
           <Switch
@@ -102,10 +104,11 @@ onMounted(refresh)
       </div>
     </section>
 
-    <ComputerUseSettings ref="computerUse" :locked="runtimeRunning" class="mt-6" @changed="refresh" />
+    <ComputerUseSettings ref="computerUse" :locked="runtimeRunning" class="computer-use-panel" @changed="refresh" />
+    </div>
     <PiExtensionManager ref="extensions" @changed="refresh" />
 
-    <details class="mt-6 rounded-xl border border-border bg-card p-4">
+    <details class="settings-panel tool-catalog">
       <summary class="cursor-pointer text-sm font-medium">{{ t("工具目录 ·") }} {{ catalog?.capabilities.length ?? 0 }}</summary>
       <div class="mt-3 flex justify-end">
 
