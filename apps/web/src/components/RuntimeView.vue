@@ -9,7 +9,7 @@ const manager = useRuntimeManager()
 </script>
 
 <template>
-  <section class="grid w-full max-w-[840px] gap-5">
+  <section class="grid w-full min-w-0 gap-5">
     <header class="flex min-h-8 items-center justify-between gap-4">
       <h1 class="m-0 text-xl leading-7 font-medium tracking-[-0.02em]">Runtime</h1>
       <span role="status" :class="['rounded-full px-2.5 py-1 text-xs font-medium', manager.running.value ? 'bg-success/10 text-success' : 'bg-secondary text-muted-foreground']">
