@@ -44,6 +44,8 @@ macOS 安装包使用长期自签名证书，未经过 Apple 公证；Windows �
 
 应用会自动检查更新，确认安装在「关于」页面操作。`.app.tar.gz`、`latest.json` 和校验文件用于更新或校验，不是首次安装入口。
 
+「关于」页面还会显示当前实际使用的 Cloudflare Tunnel（cloudflared）版本，并可单独检查、安装官方正式版更新。更新前需停止 Runtime 与隧道；下载文件通过官方 SHA-256 和版本检查后才启用，下次启动隧道生效，无需重启应用。独立更新保存在运行配置旁的 `components/cloudflared/` 目录，不改写已签名的应用包；下载或验证失败时继续保留原组件。自定义隧道程序路径需自行更新。
+
 ## Computer Use
 
 让 AI 不只读写文件，还能通过内置 Computer Use 操作桌面与浏览器。

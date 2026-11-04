@@ -156,6 +156,15 @@ export class DesktopCommandRouter {
           network_providers: providerDefinitions(),
         };
       case "get_app_version": return this.#options.version;
+      case "get_cloudflared_status":
+        if (!this.#options.runtime.cloudflaredStatus) throw new Error("cloudflared 版本信息不可用");
+        return this.#options.runtime.cloudflaredStatus();
+      case "check_cloudflared_update":
+        if (!this.#options.runtime.checkCloudflaredUpdate) throw new Error("cloudflared 更新不可用");
+        return this.#options.runtime.checkCloudflaredUpdate();
+      case "update_cloudflared":
+        if (!this.#options.runtime.updateCloudflared || typeof request.args[0] !== "string") throw new Error("请先检查 cloudflared 更新");
+        return this.#options.runtime.updateCloudflared(request.args[0]);
       case "get_runtime": return runtimeView;
       case "configure_runtime": {
         await this.#options.runtime.configure(this.#configuration(request.args[0]));

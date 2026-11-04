@@ -44,6 +44,8 @@ macOS installers use a long-lived self-signed certificate and are not notarized 
 
 The app checks for updates automatically; confirm installation on the **About** page. `.app.tar.gz`, `latest.json`, and checksum files are for updates or verification, not first-time installation.
 
+**About** also shows the version of the Cloudflare Tunnel (cloudflared) executable currently in use, with separate checks and installation of official stable updates. Stop Runtime and the tunnel before updating. Downloads must pass the official SHA-256 and executable version checks before activation; the next tunnel start uses the update without restarting the app. Updates are stored in `components/cloudflared/` beside the runtime configuration, leaving the signed application bundle untouched. Failed downloads or validation leave the original component in place. Custom executable paths must be updated manually.
+
 ## Computer Use
 
 Go beyond reading and writing files: let AI operate your desktop and browser through built-in Computer Use.

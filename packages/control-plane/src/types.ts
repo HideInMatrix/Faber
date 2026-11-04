@@ -97,6 +97,9 @@ export interface RuntimeTool {
 }
 
 export interface RuntimeControl {
+  cloudflaredStatus?(): Promise<CloudflaredStatus>;
+  checkCloudflaredUpdate?(): Promise<CloudflaredStatus>;
+  updateCloudflared?(version: string): Promise<CloudflaredStatus>;
   previewSkillImport?(path: string, replaceSourceId?: string): Promise<{
     path: string;
     candidates: readonly { id: string; name: string; description: string; path: string; status: "new" | "existing" | "conflict"; warnings: readonly string[] }[];
@@ -125,6 +128,19 @@ export interface RuntimeControl {
   readSkill?(id: string): Promise<{ id: string; document: string; revision: string; files: readonly { path: string; size: number }[] }>;
   editSkill?(id: string, document: string, revision: string): Promise<void>;
   testMcpConnection?(value: McpConnectionConfig): Promise<{ readonly tools: readonly string[] }>;
+}
+
+export interface CloudflaredStatus {
+  readonly runtimeBusy: boolean;
+  readonly version: string;
+  readonly executable: string;
+  readonly source: "bundled" | "updated" | "custom";
+  readonly supported: boolean;
+  readonly phase: "idle" | "checking" | "updating";
+  readonly latestVersion: string;
+  readonly checkedAt: number;
+  readonly updateAvailable: boolean;
+  readonly error: string;
 }
 
 export interface ControlPlaneOptions {

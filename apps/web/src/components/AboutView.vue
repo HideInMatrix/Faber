@@ -42,6 +42,7 @@ defineEmits<{ check: []; install: []; restart: []; savePrefix: [] }>()
         </template>
         <p v-else class="text-muted-foreground">{{ t("Web 页面不支持安装桌面更新，请在桌面应用中检查更新。") }}</p>
       </div>
+      <slot name="components" />
       <small class="mt-4 block text-[10px] text-muted-foreground">Copyright © micromatrix.org</small>
     </div>
   </section>

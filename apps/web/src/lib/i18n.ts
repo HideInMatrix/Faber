@@ -3,6 +3,21 @@ export const LOCALE_STORAGE_KEY = 'faber-interface-language'
 
 // Default/fallback messages stay Chinese. Raw logs and user content are not translated.
 export const englishMessages: Readonly<Record<string, string>> = {
+  'cloudflared 版本信息不可用': 'cloudflared version information is unavailable',
+  'cloudflared 更新不可用': 'cloudflared updates are unavailable',
+  '请先检查 cloudflared 更新': 'Check for cloudflared updates first',
+  '隧道组件 cloudflared，可独立于应用更新。': 'The cloudflared tunnel component can be updated separately from the app.',
+  '正在使用自定义程序，请自行更新；移除自定义路径后可更新内置组件。': 'A custom executable is in use. Update it manually, or remove its path to update the built-in component.',
+  '当前使用独立更新版本。': 'Using a separately updated version.',
+  '正在检查 cloudflared 更新…': 'Checking for cloudflared updates…',
+  '正在下载、校验并安装 cloudflared…': 'Downloading, verifying and installing cloudflared…',
+  'cloudflared 已是最新正式版。': 'cloudflared is up to date.',
+  '检查 cloudflared 更新': 'Check cloudflared updates',
+  '更新 cloudflared': 'Update cloudflared',
+  '请先停止 Runtime 与隧道，再更新 cloudflared。': 'Stop Runtime and the tunnel before updating cloudflared.',
+  '更新成功后下次启动隧道时生效，无需重启应用；下载或校验失败会保留原组件。': 'Updates take effect the next time the tunnel starts; no app restart is needed. Download or verification failures leave the original component unchanged.',
+  '当前平台不支持独立更新 cloudflared。': 'Separate cloudflared updates are not supported on this platform.',
+  'cloudflared 更新完成，下次启动隧道时生效。': 'cloudflared updated. The next tunnel start will use this version.',
   '浏览器连接方式': 'Browser connection mode',
   '托管独立窗口（无需 CDP）': 'Managed separate window (no CDP setup)',
   '附加现有 CDP 浏览器': 'Attach to an existing CDP browser',

@@ -1,4 +1,5 @@
 import { t } from './useLocale'
+import { componentUpdateBusy } from './useComponentUpdate'
 import { computed, reactive, ref } from 'vue'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { Update } from '@tauri-apps/plugin-updater'
@@ -37,11 +38,11 @@ const controller = createUpdateController(state, {
   relaunch,
   installationLock: value => { updateInstallationLocked.value = value },
 })
-const busy = computed(() => savingPrefix.value || ['checking', 'downloading', 'installing'].includes(state.phase))
+const busy = computed(() => componentUpdateBusy.value || savingPrefix.value || ['checking', 'downloading', 'installing'].includes(state.phase))
 const progress = computed(() => state.total ? Math.min(100, Math.round(state.downloaded / state.total * 100)) : null)
 
 async function check() {
-  if (!native || savingPrefix.value) return
+  if (!native || savingPrefix.value || componentUpdateBusy.value) return
   await controller.check()
   if (state.phase === 'available' && state.version !== announcedVersion) {
     announcedVersion = state.version
@@ -69,7 +70,7 @@ export function useAppUpdater() {
       try { await loadPreferences() } catch (error) { state.error = error instanceof Error ? error.message : String(error) }
     },
     savePrefix, check,
-    install: () => native && !savingPrefix.value ? controller.install() : Promise.resolve(),
+    install: () => native && !savingPrefix.value && !componentUpdateBusy.value ? controller.install() : Promise.resolve(),
     restart: () => native ? controller.restart() : Promise.resolve(),
   }
 }

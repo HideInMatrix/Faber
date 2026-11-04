@@ -1,3 +1,16 @@
+export interface CloudflaredStatusDto {
+  runtimeBusy: boolean
+  version: string
+  executable: string
+  source: 'bundled' | 'updated' | 'custom'
+  supported: boolean
+  phase: 'idle' | 'checking' | 'updating'
+  latestVersion: string
+  checkedAt: number
+  updateAvailable: boolean
+  error: string
+}
+
 export interface NetworkConfigDto {
   provider: string
   public_url: string

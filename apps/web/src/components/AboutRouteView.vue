@@ -4,6 +4,7 @@ import { toast } from 'vue-sonner'
 import { desktopApi } from '../api/desktop'
 import { useAppUpdater } from '../composables/useAppUpdater'
 import AboutView from './AboutView.vue'
+import CloudflaredUpdate from './CloudflaredUpdate.vue'
 
 const version = ref('')
 const updater = useAppUpdater()
@@ -19,6 +20,8 @@ onMounted(async () => {
 
 <template>
   <div class="grid gap-4">
-    <AboutView v-model:prefix="updater.prefixDraft.value" :version="version" :update="updater.state" :native="updater.native" :busy="updater.busy.value" :progress="updater.progress.value" @check="updater.check" @install="updater.install" @restart="updater.restart" @save-prefix="updater.savePrefix" />
+    <AboutView v-model:prefix="updater.prefixDraft.value" :version="version" :update="updater.state" :native="updater.native" :busy="updater.busy.value" :progress="updater.progress.value" @check="updater.check" @install="updater.install" @restart="updater.restart" @save-prefix="updater.savePrefix">
+      <template #components><CloudflaredUpdate /></template>
+    </AboutView>
   </div>
 </template>

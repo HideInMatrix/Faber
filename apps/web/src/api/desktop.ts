@@ -19,6 +19,7 @@ import type {
   PiSkillImportPreviewDto,
   ComputerUseStatusDto,
   ComputerUseBrowserConfigurationDto,
+  CloudflaredStatusDto,
 } from '../types'
 
 interface DesktopApiRequest {
@@ -60,7 +61,7 @@ async function request<T>(method: string, args: unknown[], signal?: AbortSignal)
   const request: DesktopApiRequest = { method, args }
   // Stop drains owned processes/routes as well as ingress. Five seconds was
   // shorter than legitimate sequential cleanup; keep a finite request budget.
-  const timeout = AbortSignal.timeout(method === 'start_runtime' ? 120_000 : method === 'stop_runtime' ? 15_000 : ['get_runtime', 'list_permission_requests'].includes(method) ? 5000 : 60_000)
+  const timeout = AbortSignal.timeout(method === 'update_cloudflared' ? 300_000 : method === 'start_runtime' ? 120_000 : method === 'stop_runtime' ? 15_000 : ['get_runtime', 'list_permission_requests'].includes(method) ? 5000 : 60_000)
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout
   try {
     const response = await fetch(`${controlUrl}/api/desktop`, {
@@ -101,6 +102,9 @@ async function request<T>(method: string, args: unknown[], signal?: AbortSignal)
 export const desktopApi = {
   bootstrap: () => call<BootstrapDto>('bootstrap'),
   appVersion: () => isTauri() ? getVersion() : call<string>('get_app_version'),
+  cloudflaredStatus: () => call<CloudflaredStatusDto>('get_cloudflared_status'),
+  checkCloudflaredUpdate: () => call<CloudflaredStatusDto>('check_cloudflared_update'),
+  updateCloudflared: (version: string) => call<CloudflaredStatusDto>('update_cloudflared', version),
   runtime: (signal?: AbortSignal) => request<RuntimeDto>('get_runtime', [], signal),
   configureRuntime: (payload: RuntimeConfigurationDto) => call<RuntimeDto>('configure_runtime', payload),
   startRuntime: (signal?: AbortSignal) => request<RuntimeDto>('start_runtime', [], signal),

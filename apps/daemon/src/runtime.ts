@@ -28,11 +28,36 @@ import { createShellPlugin } from "@micromatrix/plugin-shell";
 import { createWorkspacePlugin } from "@micromatrix/plugin-workspace";
 
 import { saveConfig, type DaemonConfig } from "./config.js";
-import { defaultCloudflaredExecutable } from "./tunnel-executable.js";
+import { CloudflaredUpdater } from "./cloudflared-update.js";
 import { APP_VERSION } from "./version.js";
 import { builtinComputerUseConfiguration, computerUseConnection } from "./builtin-computer-use.js";
 
 export class RuntimeSupervisor implements RuntimeControl {
+  readonly #cloudflared: CloudflaredUpdater;
+
+  async cloudflaredStatus() {
+    return { ...await this.#cloudflared.status(this.#cloudflaredCustomExecutable()),
+      runtimeBusy: Boolean(this.#running || this.#transition || this.#stopping) };
+  }
+  async checkCloudflaredUpdate() {
+    await this.#cloudflared.check(this.#cloudflaredCustomExecutable());
+    return this.cloudflaredStatus();
+  }
+  async updateCloudflared(version: string) {
+    // Reject immediately instead of letting an update silently run after a queued Start/Stop.
+    if (this.#running || this.#transition || this.#stopping) throw new Error("请先停止 Runtime 与隧道，再更新 cloudflared");
+    return this.#exclusive(async () => {
+      if (this.#failureCleanup) await this.#failureCleanup;
+      const status = await this.#cloudflared.install(version, this.#cloudflaredCustomExecutable());
+      // Providers capture their executable at construction; rebuild on the next Start.
+      this.#provider = undefined;
+      this.#logger.log("info", "cloudflared updated", { version: status.version });
+      return status;
+    });
+  }
+  #cloudflaredCustomExecutable(): string {
+    return this.#config.network.provider === "cloudflare" ? this.#config.network.options.executable ?? "" : "";
+  }
   computerUseConnection(): McpConnectionConfig {
     return computerUseConnection(this.#config.workspace, true, false, this.#config.computerUse);
   }
@@ -121,6 +146,7 @@ export class RuntimeSupervisor implements RuntimeControl {
   readonly #mcpHealth = new Map<string, { status: string; message: string; discoveredAt: number }>();
 
   constructor(config: DaemonConfig, logger: PluginLogger) {
+    this.#cloudflared = new CloudflaredUpdater(config.configFile);
     const builtin = builtinComputerUseConfiguration(config.computerUse, parseExtensions(config.extensions));
     this.#config = { ...config, computerUse: builtin.configuration, extensions: builtin.extensions };
     this.#logger = logger;
@@ -186,6 +212,10 @@ export class RuntimeSupervisor implements RuntimeControl {
         const workspace = await stat(this.#config.workspace).catch(() => undefined);
         if (!workspace?.isDirectory()) throw new Error(`Workspace is not a directory: ${this.#config.workspace}`);
         this.#assertSecuredExposure();
+        if (this.#config.network.provider === "cloudflare") {
+          await this.#cloudflared.refresh();
+          this.#provider = undefined;
+        }
         const preview = this.#service ?? this.#createService(this.#config, this.#registry);
         const provider = this.#provider ?? this.#createProvider(this.#config, preview);
         this.#provider = provider;
@@ -656,7 +686,7 @@ export class RuntimeSupervisor implements RuntimeControl {
     const executable = options.executable;
     switch (config.network.provider) {
       case "cloudflare": return new CloudflareNetworkProvider({
-        executable: executable || defaultCloudflaredExecutable(),
+        executable: this.#cloudflared.executable(executable),
         publicUrl: config.network.publicUrl,
         tunnelToken: options.tunnel_token || undefined,
         protocol: parseCloudflareProtocol(options.protocol),
