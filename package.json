@@ -1,6 +1,6 @@
 {
   "name": "faber-workbench",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
   "packageManager": "npm@11",
