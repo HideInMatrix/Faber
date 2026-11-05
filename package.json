@@ -38,7 +38,7 @@
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.87.1",
     "@earendil-works/pi-coding-agent": "0.87.1",
-    "@hideinmatrix/computer-use": "0.5.0",
+    "@hideinmatrix/computer-use": "0.5.2",
     "@modelcontextprotocol/sdk": "1.32.1"
   },
   "devDependencies": {
