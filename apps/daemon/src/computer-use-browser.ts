@@ -6,8 +6,9 @@ import { browserConfiguration } from "@hideinmatrix/computer-use";
 /** Accept bare origins entered by users; never broaden paths or credential URLs. */
 export function parseComputerUseBrowser(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid browser configuration");
-  const raw = Reflect.get(value, "allowedOrigins");
-  if (!Array.isArray(raw) || !raw.length || raw.length > 32) throw new Error("允许的网站须为 1-32 个 HTTP(S) origin");
+  const raw = Reflect.get(value, "allowedOrigins") ?? [];
+  const restricted = Reflect.get(value, "restrictOrigins") === true;
+  if (!Array.isArray(raw) || (restricted && !raw.length) || raw.length > 32) throw new Error("允许的网站须为 1-32 个 HTTP(S) origin");
   const allowedOrigins = raw.map(item => {
     if (typeof item !== "string" || item.length > 4096) throw new Error("Invalid browser origin");
     const text = item.trim(), url = new URL(text);

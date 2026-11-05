@@ -17,8 +17,8 @@ export interface ComputerUsePermissionStatus {
   readonly requiresScreenRecording: false;
 }
 export type ComputerUseBrowserConfiguration =
-  | { readonly mode?: "attach" | undefined; readonly endpoint: string; readonly allowedOrigins: readonly string[] }
-  | { readonly mode: "managed"; readonly channel?: "chromium" | "chrome" | "msedge" | undefined; readonly profile?: string | undefined; readonly allowedOrigins: readonly string[]; readonly startUrl?: string | undefined };
+  | { readonly mode?: "attach" | undefined; readonly endpoint: string; readonly restrictOrigins?: boolean | undefined; readonly allowedOrigins?: readonly string[] | undefined }
+  | { readonly mode: "managed"; readonly channel?: "chromium" | "chrome" | "msedge" | undefined; readonly profile?: string | undefined; readonly restrictOrigins?: boolean | undefined; readonly allowedOrigins?: readonly string[] | undefined; readonly startUrl?: string | undefined };
 
 export interface BuiltinComputerUseStatus {
   readonly browser?: ComputerUseBrowserConfiguration;

@@ -22,6 +22,7 @@ const browserChannel = ref<'chrome' | 'msedge' | 'chromium'>('chrome')
 const browserProfile = ref('default')
 const browserStartUrl = ref('')
 const browserOrigins = ref('')
+const browserRestrictOrigins = ref(false)
 const browserDirty = ref(false)
 const browserError = ref('')
 function loadBrowser() {
@@ -29,7 +30,8 @@ function loadBrowser() {
   const browser = status.value?.browser
   browserMode.value = browser?.mode === 'managed' || !browser ? 'managed' : 'attach'
   browserEndpoint.value = browser && browser.mode !== 'managed' ? browser.endpoint : ''
-  browserOrigins.value = browser?.allowedOrigins.join('\n') ?? ''
+  browserOrigins.value = browser?.allowedOrigins?.join('\n') ?? ''
+  browserRestrictOrigins.value = browser?.restrictOrigins ?? false
   browserChannel.value = browser?.mode === 'managed' ? browser.channel ?? 'chrome' : 'chrome'
   browserProfile.value = browser?.mode === 'managed' ? browser.profile ?? 'default' : 'default'
   browserStartUrl.value = browser?.mode === 'managed' ? browser.startUrl ?? '' : ''
@@ -82,13 +84,14 @@ async function saveBrowser(clear = false) {
   await action(async () => {
     browserError.value = ''
     const endpoint = browserEndpoint.value.trim()
-    const allowedOrigins = [...new Set(browserOrigins.value.split(/\r?\n/).map(value => value.trim()).filter(Boolean))]
-    if (!clear && !allowedOrigins.length) throw new Error(t("至少填写一个允许的网站"))
-    if (!clear && browserMode.value === 'attach' && !endpoint) throw new Error(t("填写本地连接地址和至少一个允许的网站"))
+    const restrictOrigins = browserRestrictOrigins.value
+    const allowedOrigins = restrictOrigins ? [...new Set(browserOrigins.value.split(/\r?\n/).map(value => value.trim()).filter(Boolean))] : []
+    if (!clear && restrictOrigins && !allowedOrigins.length) throw new Error(t("至少填写一个允许的网站"))
+    if (!clear && browserMode.value === 'attach' && !endpoint) throw new Error(t("填写本地浏览器连接地址"))
     const startUrl = browserStartUrl.value.trim()
     status.value = await desktopApi.configureComputerUseBrowser(clear ? null : browserMode.value === 'managed'
-      ? { mode: 'managed', channel: browserChannel.value, profile: browserProfile.value.trim(), allowedOrigins, ...(startUrl ? { startUrl } : {}) }
-      : { mode: 'attach', endpoint, allowedOrigins })
+      ? { mode: 'managed', channel: browserChannel.value, profile: browserProfile.value.trim(), restrictOrigins, allowedOrigins, ...(startUrl ? { startUrl } : {}) }
+      : { mode: 'attach', endpoint, restrictOrigins, allowedOrigins })
     browserDirty.value = false
     loadBrowser()
     emit('changed')
@@ -144,7 +147,12 @@ defineExpose({ refresh: () => action(refresh) })
           <p class="text-xs text-muted-foreground">{{ t("使用专用登录态，不读取日常浏览器资料。首次明确选择浏览器通道并经审批后启动独立窗口；保存和启动 Runtime 均不会打开浏览器。") }}</p>
           <p class="text-xs text-muted-foreground">{{ t("Chrome / Edge 必须已安装；Chromium 需要另行准备匹配版本，不会自动下载。停止 Runtime 会关闭托管窗口，保留独立会话。") }}</p>
         </template>
-        <FormField :label="t('允许的网站（每行一个）')">
+        <div class="flex items-center justify-between gap-4">
+          <label for="computer-browser-site-restriction" class="text-sm">{{ t("限制可访问的网站") }}</label>
+          <Switch id="computer-browser-site-restriction" v-model="browserRestrictOrigins" :aria-label="t('限制可访问的网站')" @update:model-value="browserDirty = true" />
+        </div>
+        <p class="text-xs text-muted-foreground">{{ t("默认可访问任意 HTTP/HTTPS 网站；开启限制后仅允许访问名单中的网站。") }}</p>
+        <FormField v-if="browserRestrictOrigins" :label="t('允许的网站（每行一个）')">
           <textarea id="computer-browser-origins" :aria-label="t('允许的网站')" v-model="browserOrigins" :rows="3" placeholder="https://example.com" @input="browserDirty = true" />
         </FormField>
         <p v-if="browserMode === 'attach'" class="text-xs text-muted-foreground">{{ t("仅连接已开启调试的独立 Chromium 浏览器；保存不启动浏览器或 Runtime。") }}</p>
