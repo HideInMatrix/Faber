@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 const root = process.cwd()
 assert(!existsSync(`${root}/packages/computer-use`), 'Private source workspace/bridge must not remain')
 const daemon = JSON.parse(readFileSync(`${root}/apps/daemon/package.json`))
-assert.equal(daemon.dependencies['@hideinmatrix/computer-use'], '0.7.1')
+assert.equal(daemon.dependencies['@hideinmatrix/computer-use'], '0.8.1')
 const rootPackage = JSON.parse(readFileSync(`${root}/package.json`))
 // Keep a root dependency edge so npm applies security overrides across the
 // daemon workspace link instead of nesting the package's original Zod pin.
@@ -13,7 +13,7 @@ const lock = JSON.parse(readFileSync(`${root}/package-lock.json`))
 assert(!lock.packages['packages/computer-use'])
 assert(!Object.keys(lock.packages).some(name => name.endsWith('node_modules/@ouvren/computer-use')))
 const entry = lock.packages['node_modules/@hideinmatrix/computer-use']
-assert(entry && !entry.link && entry.version === '0.7.1', 'Lockfile must pin an installed registry package')
+assert(entry && !entry.link && entry.version === '0.8.1', 'Lockfile must pin an installed registry package')
 assert.equal(new URL(entry.resolved).origin, 'https://npm.pkg.github.com')
 assert(!new URL(entry.resolved).username && !new URL(entry.resolved).password, 'Never store registry credentials in lockfile')
 assert.match(entry.integrity, /^sha512-/)

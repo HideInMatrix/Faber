@@ -21,7 +21,9 @@ function nativeArgs(directory:string){
 }
 export async function getBrowserExtensionStatus(workspace:string,browser:ExtensionBrowser):Promise<BrowserExtensionStatus>{
  const directory=computerUseBrowserDataDirectory(workspace),extensionDirectory=join(directory,'browser-extension');
- return {...await browserExtensionStatus(directory,browser),prepared:existsSync(join(extensionDirectory,'manifest.json')),extensionDirectory,extensionId:browserExtensionId,extensionsPage:browser==='chrome'?'chrome://extensions':'edge://extensions'};
+ const prepared=existsSync(join(extensionDirectory,'manifest.json'));
+ const status=await browserExtensionStatus(directory,browser);
+ return {...status,...(!prepared?{reason:'请先点击“准备浏览器扩展”，再按说明加载扩展；安装后将自动连接'}:{}),prepared,extensionDirectory,extensionId:browserExtensionId,extensionsPage:browser==='chrome'?'chrome://extensions':'edge://extensions'};
 }
 export async function prepareHostedBrowserExtension(workspace:string,browser:ExtensionBrowser):Promise<BrowserExtensionStatus>{
  const directory=computerUseBrowserDataDirectory(workspace);

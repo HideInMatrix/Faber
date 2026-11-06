@@ -168,14 +168,15 @@ defineExpose({ refresh: () => action(refresh) })
           <div class="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline" @click="prepareExtension">{{ t("准备浏览器扩展") }}</Button>
             <Button size="sm" variant="outline" @click="action(readExtensionStatus, true)">{{ t("刷新连接状态") }}</Button>
-            <span role="status" :aria-label="t('扩展连接状态')" class="text-xs text-muted-foreground">{{ extensionStatus?.connected ? extensionStatus.paused ? t("已暂停，在扩展中继续") : t("浏览器扩展已连接") : t("浏览器扩展未连接") }}</span>
+            <span role="status" :aria-label="t('扩展连接状态')" class="text-xs text-muted-foreground">{{ extensionStatus?.connected ? extensionStatus.paused ? t("已停止，在对话中说继续") : t("浏览器扩展已连接") : t("浏览器扩展未连接") }}</span>
           </div>
+          <p v-if="extensionStatus?.reason" class="text-xs text-muted-foreground" role="status">{{ extensionStatus.reason }}</p>
           <div v-if="extensionStatus?.prepared" class="rounded-lg border border-border p-3 space-y-2 text-xs">
             <p>{{ t("首次安装：在浏览器地址栏打开下方地址，开启开发者模式，加载已解压的扩展并选择扩展目录。") }}</p>
             <FormField :label="t('扩展管理地址')"><input :value="extensionStatus.extensionsPage" readonly :aria-label="t('扩展管理地址')" /></FormField>
             <FormField :label="t('扩展目录')"><input :value="extensionStatus.extensionDirectory" readonly :aria-label="t('扩展目录')" /></FormField>
             <Button size="sm" variant="outline" @click="copyExtensionPath">{{ t("复制扩展目录") }}</Button>
-            <p>{{ t("安装后打开 Faber 扩展并点击连接 Faber，再保存此浏览器连接。取消或暂停后需在扩展中继续。") }}</p>
+            <p>{{ t("扩展安装后自动连接，意外断线自动重连；工具栏可查看状态和失败原因。主动停止后，在对话中告诉 AI“继续”即可恢复，无需点击浏览器按钮。") }}</p>
           </div>
         </template>
         <FormField v-else-if="browserMode === 'attach'" :label="t('本地浏览器连接地址')">

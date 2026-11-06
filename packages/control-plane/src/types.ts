@@ -16,7 +16,7 @@ export interface ComputerUsePermissionStatus {
   readonly promptRequested: boolean;
   readonly requiresScreenRecording: false;
 }
-export interface BrowserExtensionStatus { connected:boolean;paused:boolean;prepared:boolean;extensionDirectory:string;extensionId:string;extensionsPage:string;browser:"chrome"|"msedge"; }
+export interface BrowserExtensionStatus { reason?:string;connected:boolean;paused:boolean;prepared:boolean;extensionDirectory:string;extensionId:string;extensionsPage:string;browser:"chrome"|"msedge"; }
 export type ComputerUseBrowserConfiguration =
   | { readonly mode:"extension";readonly channel?:"chrome"|"msedge"|undefined;readonly restrictOrigins?:boolean|undefined;readonly allowedOrigins?:readonly string[]|undefined }
   | { readonly mode?: "attach" | undefined; readonly endpoint: string; readonly restrictOrigins?: boolean | undefined; readonly allowedOrigins?: readonly string[] | undefined }
