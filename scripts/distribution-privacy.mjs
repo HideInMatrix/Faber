@@ -26,11 +26,12 @@ const macFile = new RegExp(`^${macPrefix}(?:MacOS/micromatrix-computer|Info\\.pl
 export function assertComputerUsePackage(directory) {
   const files = filesIn(directory)
   const required = ['package.json', 'dist/index.js', 'dist/index.d.ts', 'dist/cli.js', 'assets/macos/Info.plist', ...notices,
+    ...['manifest.json','worker.js','popup.js','popup.html','popup.css'].map(file=>'assets/browser-extension/'+file),
     ...['aarch64', 'x86_64'].map(arch => `binaries/${arch}-apple-darwin/development/micromatrix Computer Use Dev.app/Contents/MacOS/micromatrix-computer`),
     'binaries/x86_64-pc-windows-msvc/development/micromatrix-computer-x86_64-pc-windows-msvc.exe']
   for (const file of required) if (!files.includes(file)) throw new Error(`Computer Use package missing: ${file}`)
   const pkg = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8'))
-  if (pkg.name !== '@hideinmatrix/computer-use' || pkg.version !== '0.6.0'
+  if (pkg.name !== '@hideinmatrix/computer-use' || pkg.version !== '0.7.1'
     || pkg.repository?.url !== 'git+https://github.com/HideInMatrix/computer-use.git'
     || pkg.scripts || pkg.devDependencies
     || Object.keys(pkg.exports ?? {}).sort().join('|') !== '.|./package.json') {
@@ -39,6 +40,7 @@ export function assertComputerUsePackage(directory) {
   for (const file of files) {
     const allowed = /^dist\/(?:[\w-]+\/)*[\w-]+(?:\.js|\.d\.ts)$/.test(file)
       || ['package.json', 'README.md', 'assets/macos/Info.plist', 'assets/macos/icon.icns', ...notices].includes(file)
+      || /^assets\/browser-extension\/(manifest\.json|worker\.js|popup\.js|popup\.html|popup\.css)$/.test(file)
       || macFile.test(file)
       || file === 'binaries/x86_64-pc-windows-msvc/development/micromatrix-computer-x86_64-pc-windows-msvc.exe'
     if (!allowed) throw new Error(`Source/debug/unexpected file refused: ${file}`)

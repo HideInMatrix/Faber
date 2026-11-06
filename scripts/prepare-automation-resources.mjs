@@ -20,6 +20,9 @@ export function prepareAutomationResources(root=process.cwd()) {
     const clean = stripSourceMaps(text)
     if (clean !== text) writeFileSync(absolute, clean)
   }
+  const extension=path.join(root,'apps/desktop/resources/automation/faber-browser-extension');
+  rmSync(extension,{recursive:true,force:true});cpSync(path.join(path.dirname(require.resolve('@hideinmatrix/computer-use/package.json')),'assets/browser-extension'),extension,{recursive:true});
+  assertDistributionTree(extension)
   assertDistributionTree(destination)
   return destination
 }

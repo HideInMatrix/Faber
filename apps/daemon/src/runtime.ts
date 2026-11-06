@@ -1,3 +1,4 @@
+import {getBrowserExtensionStatus,prepareHostedBrowserExtension,extensionBrowser} from "./browser-extension.js";
 import { stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -58,6 +59,10 @@ export class RuntimeSupervisor implements RuntimeControl {
   #cloudflaredCustomExecutable(): string {
     return this.#config.network.provider === "cloudflare" ? this.#config.network.options.executable ?? "" : "";
   }
+  async computerUseBrowserExtensionStatus(browser: unknown) { return getBrowserExtensionStatus(this.#config.workspace, extensionBrowser(browser)); }
+  async prepareComputerUseBrowserExtension(browser: unknown) {
+    return this.#exclusive(async()=>{this.#assertExtensionsEditable();if(this.#failureCleanup)await this.#failureCleanup;return prepareHostedBrowserExtension(this.#config.workspace,extensionBrowser(browser));});
+  }
   computerUseConnection(): McpConnectionConfig {
     return computerUseConnection(this.#config.workspace, true, false, this.#config.computerUse);
   }
@@ -94,7 +99,7 @@ export class RuntimeSupervisor implements RuntimeControl {
       this.#assertExtensionsEditable();
       if (this.#failureCleanup) await this.#failureCleanup;
       const browser = value === null ? undefined : parseComputerUseBrowser(value);
-      if (browser?.mode === "managed") computerUseBrowserDataDirectory(this.#config.workspace);
+      if (browser?.mode === "managed" || browser?.mode === "extension") computerUseBrowserDataDirectory(this.#config.workspace);
       const { browser: _previous, ...configuration } = this.#config.computerUse ?? {enabled: false, allowActions: true};
       // Parse and persist only: no browser connection, profile discovery,
       // download, permission prompt or Runtime/Tunnel startup on Save.

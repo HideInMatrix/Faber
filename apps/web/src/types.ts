@@ -151,7 +151,9 @@ export interface PiMcpConnectionDto {
   headers: Record<string, string>
 }
 
+export interface BrowserExtensionStatusDto {connected:boolean;paused:boolean;prepared:boolean;extensionDirectory:string;extensionId:string;extensionsPage:string;browser:'chrome'|'msedge';}
 export type ComputerUseBrowserConfigurationDto =
+  | {mode:'extension';channel:'chrome'|'msedge';restrictOrigins?:boolean;allowedOrigins?:string[]}
   | { mode?: 'attach'; endpoint: string; restrictOrigins?: boolean; allowedOrigins?: string[] }
   | { mode: 'managed'; channel: 'chromium' | 'chrome' | 'msedge'; profile: string; restrictOrigins?: boolean; allowedOrigins?: string[]; startUrl?: string };
 

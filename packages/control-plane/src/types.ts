@@ -16,7 +16,9 @@ export interface ComputerUsePermissionStatus {
   readonly promptRequested: boolean;
   readonly requiresScreenRecording: false;
 }
+export interface BrowserExtensionStatus { connected:boolean;paused:boolean;prepared:boolean;extensionDirectory:string;extensionId:string;extensionsPage:string;browser:"chrome"|"msedge"; }
 export type ComputerUseBrowserConfiguration =
+  | { readonly mode:"extension";readonly channel?:"chrome"|"msedge"|undefined;readonly restrictOrigins?:boolean|undefined;readonly allowedOrigins?:readonly string[]|undefined }
   | { readonly mode?: "attach" | undefined; readonly endpoint: string; readonly restrictOrigins?: boolean | undefined; readonly allowedOrigins?: readonly string[] | undefined }
   | { readonly mode: "managed"; readonly channel?: "chromium" | "chrome" | "msedge" | undefined; readonly profile?: string | undefined; readonly restrictOrigins?: boolean | undefined; readonly allowedOrigins?: readonly string[] | undefined; readonly startUrl?: string | undefined };
 
@@ -108,6 +110,8 @@ export interface RuntimeControl {
   importSkills?(path: string, selectedPaths: readonly string[], replaceSourceId?: string): Promise<number>;
   computerUseStatus?(): BuiltinComputerUseStatus;
   configureComputerUseBrowser?(value: unknown): Promise<void>;
+  computerUseBrowserExtensionStatus?(browser: unknown):Promise<BrowserExtensionStatus>;
+  prepareComputerUseBrowserExtension?(browser: unknown):Promise<BrowserExtensionStatus>;
   setComputerUseEnabled?(enabled: boolean): Promise<void>;
   checkComputerUsePermissions?(request: boolean): Promise<BuiltinComputerUseStatus>;
   computerUseConnection?(): McpConnectionConfig;

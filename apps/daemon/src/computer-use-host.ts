@@ -46,7 +46,7 @@ export async function startHostedComputerUseMcp(options: {
       desktop, new RemoteDesktopAdapter(desktop), new VisualDesktopAdapter(desktop),
       new JsonDocumentAdapter(options.workspace),
       ...(options.browser ? [new BrowserAdapter(options.browser, options.browser.mode === "managed"
-        ? { dataDirectory: computerUseBrowserDataDirectory(options.workspace) } : {})] : []), ...installed,
+        ? { dataDirectory: computerUseBrowserDataDirectory(options.workspace) } : options.browser.mode === "extension" ? { extensionDirectory: computerUseBrowserDataDirectory(options.workspace) } : {})] : []), ...installed,
     ], options.allowActions);
   } catch (error) {
     await Promise.all(installed.map(provider => provider.close()));

@@ -3,6 +3,7 @@ import { webAssets } from "@micromatrix/web-assets";
 import { parseComputerUseBrowser } from "./computer-use-browser.js";
 import { startHostedComputerUseMcp } from "./computer-use-host.js";
 import path from "node:path";
+import { runHostedBrowserExtension } from "./browser-extension.js";
 
 import { loadConfig } from "./config.js";
 import { RuntimeSupervisor } from "./runtime.js";
@@ -46,6 +47,7 @@ async function main(): Promise<void> {
 }
 
 async function entry(): Promise<void> {
+  if(process.argv.includes("--browser-extension-host")||process.argv.some(arg=>arg.startsWith("chrome-extension://")))return runHostedBrowserExtension();
   if (!process.argv.includes("--computer-use-mcp")) return main();
   const index = process.argv.indexOf("--workspace");
   if (index >= 0 && (!process.argv[index+1] || process.argv[index+1]!.startsWith("--"))) throw new Error("--workspace requires a directory");

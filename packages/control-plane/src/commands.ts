@@ -201,6 +201,12 @@ export class DesktopCommandRouter {
         if (typeof request.args[0] !== "boolean") throw new Error("Computer Use enabled must be a boolean");
         await this.#options.runtime.setComputerUseEnabled(request.args[0]);
         return this.#options.runtime.computerUseStatus?.();
+      case "get_computer_use_browser_extension_status":
+        if(!this.#options.runtime.computerUseBrowserExtensionStatus)throw new Error("Browser extension unavailable");
+        return this.#options.runtime.computerUseBrowserExtensionStatus(request.args[0]);
+      case "prepare_computer_use_browser_extension":
+        if(!this.#options.runtime.prepareComputerUseBrowserExtension)throw new Error("Browser extension unavailable");
+        return this.#options.runtime.prepareComputerUseBrowserExtension(request.args[0]);
       case "configure_computer_use_browser":
         if (!this.#options.runtime.configureComputerUseBrowser) throw new Error("Computer Use browser configuration unavailable");
         if (request.args.length !== 1) throw new Error("One browser configuration or null is required");
