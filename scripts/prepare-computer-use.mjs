@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, chmodSync, copyFileSync, cpSync, rmSync, writeFileSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { computerUsePackageRoot, computerUseNativeResource } from './computer-use-package.mjs'
+import { prepareComputerUseRuntime } from './prepare-computer-use-runtime.mjs'
 import { nativeBuildTarget } from './build-platform.mjs'
 import { buildChannel, macSigningIdentity, macReleaseRequirement } from './build-channel.mjs'
 import { assertDistributionTree } from './distribution-privacy.mjs'
@@ -19,6 +20,7 @@ export function prepareComputerUse(root = process.cwd()) {
   if (!windows) execFileSync('/usr/bin/codesign', ['--verify', '--deep', '--strict', resource.application], { stdio: 'inherit' })
   copyFileSync(resource.binary, output)
   chmodSync(output, 0o755)
+  if(windows)prepareComputerUseRuntime(computerUsePackageRoot,path.join(root,'apps/desktop/resources/computer-use'))
   if (!windows) {
     const application = path.join(root, 'apps/desktop/binaries/Faber Computer Use.app')
     rmSync(application, { recursive: true, force: true })
