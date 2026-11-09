@@ -35,7 +35,7 @@ export function assertComputerUsePackage(directory) {
   if (hasRdp) required.push(computerUseRdpFile, ...computerUseRdpNotices)
   for (const file of required) if (!files.includes(file)) throw new Error(`Computer Use package missing: ${file}`)
   const pkg = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8'))
-  if (pkg.name !== '@hideinmatrix/computer-use' || pkg.version !== '0.8.1'
+  if (pkg.name !== '@hideinmatrix/computer-use' || pkg.version !== '0.9.0'
     || pkg.repository?.url !== 'git+https://github.com/HideInMatrix/computer-use.git'
     || pkg.scripts || pkg.devDependencies
     || Object.keys(pkg.exports ?? {}).sort().join('|') !== '.|./package.json') {
