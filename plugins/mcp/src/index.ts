@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { ExternalMcpError, type McpConnectionConfig } from "@micromatrix/plugin-kit";
@@ -11,11 +10,6 @@ import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
 export { McpAuthStore } from "./auth.js";
-
-export function exposedMcpName(server: string, tool: string): string {
-  const readable = tool.replace(/[^A-Za-z0-9_]/g, "_").slice(0, 22);
-  return `mcp__${server}__${readable}_${createHash("sha256").update(tool).digest("hex").slice(0, 8)}`;
-}
 
 function resolveHeader(value: string, values: Readonly<Record<string, string>> = {}): string {
   return value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, name: string) => {
@@ -109,7 +103,6 @@ export class McpConnection {
     } while (cursor);
     if (this.#closing || !this.#connected) throw new Error("MCP closed during discovery");
     if (new Set(tools.map(tool => tool.name)).size !== tools.length) throw new Error("MCP server returned duplicate tool names");
-    if (new Set(tools.map(tool => exposedMcpName(this.config.id, tool.name))).size !== tools.length) throw new Error("MCP exposed tool names collide; rename upstream tools");
     if (JSON.stringify(tools) !== JSON.stringify(this.#tools)) { this.#tools = tools; this.options.onTools?.(tools); }
     this.options.onStatus?.("connected", "");
     return tools;
@@ -153,9 +146,8 @@ export function createMcpExtension(config: McpConnectionConfig, options: McpOpti
     let connection: McpConnection | undefined;
     const register = (tools: readonly Tool[]) => {
       for (const tool of tools) {
-        const name = exposedMcpName(config.id, tool.name);
         pi.registerTool({
-          name, label: `${config.name}: ${tool.title ?? tool.name}`,
+          name: tool.name, label: `${config.name}: ${tool.title ?? tool.name}`,
           description: `[External MCP: ${config.name}] ${tool.description ?? tool.name}`,
           parameters: tool.inputSchema as AgentTool["parameters"],
           async execute(_id, params, signal) {
@@ -169,7 +161,7 @@ export function createMcpExtension(config: McpConnectionConfig, options: McpOpti
           },
         });
       }
-      onCatalog?.(tools.map(tool => exposedMcpName(config.id, tool.name)));
+      onCatalog?.(tools.map(tool => tool.name));
     };
     pi.on("session_start", async (_event, ctx) => {
       connection = new McpConnection(config, { ...options, onTools: tools => { register(tools); options.onTools?.(tools); } });

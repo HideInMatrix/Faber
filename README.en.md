@@ -63,6 +63,12 @@ Stop Runtime, open **Plugins → Skills → Add Skill**, select a local director
 
 Already configured files (including disabled entries) are skipped, and conflicting Skill names are marked in the preview. Compatibility warnings do not block other documents. Existing directory sources offer **Split directory**: confirmation replaces that reference with the selected independent entries; cancelling leaves it unchanged. Import only saves file references: it does not copy, delete or execute original files, or automatically load unconfigured global directories.
 
+## MCP tool names
+
+External MCP tools retain their original server-provided names, such as `computer_act` and `lanhu_get_design_overview`. Faber adds no service prefix, truncation or hash suffix. Names must be unique across all sources, including built-in tools; collisions produce an explicit error instead of overwriting another tool.
+
+After upgrading from older versions, stop and restart Runtime, then refresh the MCP client's tool list or reconnect the existing plugin. The server URL, OAuth authorization and upstream tools do not need changes. Fixed calls written with the old tool names must use the original names instead.
+
 ## Interface language
 
 The interface defaults to Chinese. Choose **English** from the language dropdown at the bottom of the sidebar menu. Your choice is remembered on this computer. Changing the language does not start or stop Runtime, or change your working directory, credentials, or approval settings.

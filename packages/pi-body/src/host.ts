@@ -65,8 +65,14 @@ export class PiBodyHost {
       // turn one warning into a failure of every skill in an imported folder.
       for (const diagnostic of diagnostics) context.logger.log("warn", "Pi Skill warning", { path: diagnostic.path, message: diagnostic.message });
       // Detect collisions explicitly: Pi's runner otherwise takes the first tool.
-      const names = loaded.extensions.flatMap((extension) => [...extension.tools.keys()]);
-      if (new Set(names).size !== names.length) throw new Error("Pi extensions registered conflicting tool names");
+      const owners = new Map<string, string>();
+      for (const extension of loaded.extensions) {
+        for (const name of extension.tools.keys()) {
+          const owner = owners.get(name);
+          if (owner) throw new Error(`Tool name collision: ${name} is provided by both ${owner} and ${extension.path}; disable one conflicting source or rename the upstream tool`);
+          owners.set(name, extension.path);
+        }
+      }
       for (const extension of loaded.extensions) {
         const tools = [...extension.tools.values()].map(tool => host.#cachedTool(tool));
         const pluginId = extension.path.match(/^<inline:(.+)>$/)?.[1] ?? extension.path;
