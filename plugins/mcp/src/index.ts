@@ -4,6 +4,7 @@ import { ExternalMcpError, type McpConnectionConfig } from "@micromatrix/plugin-
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { CallToolResultSchema, ToolListChangedNotificationSchema, type CallToolResult, type Tool } from "@modelcontextprotocol/sdk/types.js";
 import { OwnedStdioTransport } from "./stdio.js";
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
@@ -20,6 +21,35 @@ function resolveHeader(value: string, values: Readonly<Record<string, string>> =
   });
 }
 
+export function mcpHeaders(config: McpConnectionConfig, values: Readonly<Record<string, string>> = {}): Record<string, string> {
+  const headers = Object.fromEntries(Object.entries(config.headers).map(([name, value]) => [name, resolveHeader(value, values)]));
+  if (config.auth === "bearer" || config.auth === "api_key") {
+    const reference = config.credentialRef ?? "MCP_TOKEN";
+    const value = resolveHeader("${" + reference + "}", values);
+    const header = config.auth === "bearer" ? "Authorization" : config.apiKeyHeader ?? "X-API-Key";
+    if (Object.keys(headers).some(name => name.toLowerCase() === header.toLowerCase())) throw new Error("Authentication Header is duplicated");
+    headers[header] = config.auth === "bearer" ? `Bearer ${value}` : value;
+  }
+  return headers;
+}
+
+export function mcpConnectionError(error: unknown, stage: string, config: McpConnectionConfig): Error {
+  // Do not expose arbitrary response bodies, URLs or echoed credentials in diagnostics.
+  const code = error && typeof error === "object" ? Reflect.get(error, "code") : undefined;
+  const message = error instanceof Error ? error.message : String(error);
+  let detail = "检查服务地址、网络及可执行程序。";
+  if (/requires OAuth login/.test(message)) return new Error(`MCP ${config.id} · OAuth 未授权，请先点击授权登录。`,{cause:error});
+  if (/^MCP (server returned duplicate tool names|server exceeds|discovery exceeded|server repeated)/.test(message)) return new Error(`MCP ${config.id} · ${stage}失败：${message}`,{cause:error});
+  if (/401|403|unauthorized|forbidden/i.test(`${code} ${message}`)) detail = config.auth === "oauth"
+    ? "OAuth 授权未被接受，请检查授权状态、客户端配置和服务端返回的限制。"
+    : "服务未接受当前认证。请检查自己的密钥；若服务要求 OAuth，请改用浏览器授权。";
+  else if (/404|405|406|415|content.type|text\/event-stream|protocol/i.test(message)) detail = "检查 MCP 路径和传输选项：Streamable HTTP 与旧版 SSE 不可混用。";
+  else if (/timeout|timed out|abort/i.test(message)) detail = "连接或工具发现超时，请检查服务网络和运行状态。";
+  else if (/Missing service environment|credential|Header/i.test(message)) detail = "认证配置缺失或格式错误，请填写密钥、环境变量或正确的 Header。";
+  // Only application-owned diagnostics are retained; the original error stays local as cause.
+  return new Error(`MCP ${config.id} · ${stage}失败：${detail}`, { cause: error });
+}
+
 /** Owned by one Pi extension session; never created while merely saving config. */
 export class McpConnection {
   readonly client = new Client({ name: "micromatrix-pi-extension", version: "0.1.0" });
@@ -29,7 +59,7 @@ export class McpConnection {
   #refresh: Promise<readonly Tool[]> | undefined;
   #closing = false;
   #refreshAgain = false;
-  #transport: OwnedStdioTransport | StreamableHTTPClientTransport | undefined;
+  #transport: OwnedStdioTransport | StreamableHTTPClientTransport | SSEClientTransport | undefined;
   #connected = false;
   constructor(config: McpConnectionConfig, options: McpOptions = {}) {
     this.config = config; this.options = options;
@@ -43,34 +73,38 @@ export class McpConnection {
     this.options.signal?.throwIfAborted();
     const signal = this.options.signal ? AbortSignal.any([AbortSignal.timeout(30_000), this.options.signal]) : AbortSignal.timeout(30_000);
     const config = this.config;
-    const env = getDefaultEnvironment();
-    for (const [target, source] of Object.entries(config.envRefs)) {
-      const value = (this.options.values && Object.hasOwn(this.options.values, source) ? this.options.values[source] : undefined) ?? (Object.hasOwn(process.env, source) ? process.env[source] : undefined);
-      if (value === undefined) throw new Error(`Missing service environment variable: ${source}`);
-      Object.defineProperty(env, target, { value, enumerable: true, configurable: true, writable: true });
-    }
-    const transport = config.transport === "stdio"
-      ? new OwnedStdioTransport(config.command, config.args, env, workspace)
-      : new StreamableHTTPClientTransport(new URL(config.url), {
-        ...optionsAuth(this.options),
-        ...(this.options.signal && this.options.fetch ? { fetch: (input, init) => this.options.fetch!(input, {
-          ...init, signal: init?.signal ? AbortSignal.any([init.signal, this.options.signal!]) : this.options.signal!,
-        }) } : {}),
-        requestInit: { headers: Object.fromEntries(Object.entries(config.headers).map(([key, value]) => [key, resolveHeader(value, this.options.values)])) },
-      });
-    this.#transport = transport;
-    this.client.onclose = () => {
-      this.#connected = false;
-      if (!this.#closing) { this.options.onStatus?.("disconnected", "Connection closed; stop and start Runtime to reconnect"); this.options.onTools?.([]); }
-    };
+    this.options.onStatus?.("connecting", "");
     try {
+      const env = getDefaultEnvironment();
+      for (const [target, source] of Object.entries(config.envRefs)) {
+        const value = (this.options.values && Object.hasOwn(this.options.values, source) ? this.options.values[source] : undefined) ?? (Object.hasOwn(process.env, source) ? process.env[source] : undefined);
+        if (value === undefined) throw new Error(`Missing service environment variable: ${source}`);
+        Object.defineProperty(env, target, { value, enumerable: true, configurable: true, writable: true });
+      }
+      const requestInit = { headers: mcpHeaders(config, this.options.values) };
+      const transportOptions = { ...optionsAuth(this.options), requestInit };
+      const transport = config.transport === "stdio"
+        ? new OwnedStdioTransport(config.command, config.args, env, workspace)
+        : config.transport === "sse" ? new SSEClientTransport(new URL(config.url), transportOptions)
+        : new StreamableHTTPClientTransport(new URL(config.url), {
+          ...optionsAuth(this.options),
+          ...(this.options.signal && this.options.fetch ? { fetch: (input, init) => this.options.fetch!(input, {
+            ...init, signal: init?.signal ? AbortSignal.any([init.signal, this.options.signal!]) : this.options.signal!,
+          }) } : {}),
+          requestInit,
+        });
+      this.#transport = transport;
+      this.client.onclose = () => {
+        this.#connected = false;
+        if (!this.#closing) { this.options.onStatus?.("disconnected", "Connection closed; stop and start Runtime to reconnect"); this.options.onTools?.([]); }
+      };
       // SDK 1.30 has a sessionId optional-property declaration mismatch under
       // exactOptionalPropertyTypes; both concrete classes implement Transport.
       await this.client.connect(transport as Transport, { timeout: 15_000, signal });
       this.#connected = true;
       this.options.onStatus?.("connected", "");
       return await this.refresh();
-    } catch (error) { await this.close(); throw error; }
+    } catch (error) { const stage = this.#connected ? "工具发现" : "连接"; await this.close(); const failure = mcpConnectionError(signal.aborted ? signal.reason : error, stage, config); this.options.onStatus?.("error",failure.message); throw failure; }
   }
 
   refresh(): Promise<readonly Tool[]> {
@@ -167,7 +201,7 @@ export function createMcpExtension(config: McpConnectionConfig, options: McpOpti
       connection = new McpConnection(config, { ...options, onTools: tools => { register(tools); options.onTools?.(tools); } });
       attach?.(connection);
       try { await connection.connect(ctx.cwd); }
-      catch (error) { options.onStatus?.("error", "Connection failed; check credentials, OAuth login and executable path"); throw error; }
+      catch (error) { options.onStatus?.("error", error instanceof Error ? error.message : "MCP connection failed"); throw error; }
     });
     pi.on("session_shutdown", async () => { await connection?.close(); connection = undefined; });
   };

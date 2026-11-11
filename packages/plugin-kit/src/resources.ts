@@ -3,18 +3,24 @@ export interface McpConnectionConfig {
   readonly id: string;
   readonly name: string;
   readonly enabled: boolean;
-  readonly transport: "stdio" | "http";
-  readonly auth?: "none" | "oauth";
-  /** Public client-owned HTTPS CIMD document; never another application's identity. */
+  readonly transport: "stdio" | "http" | "sse";
+  readonly auth?: "none" | "bearer" | "api_key" | "oauth";
+  readonly credentialRef?: string;
+  readonly apiKeyHeader?: string;
+  readonly oauthClientId?: string;
+  readonly oauthClientSecretRef?: string;
+  readonly oauthScopes?: string;
+  readonly oauthTokenAuthMethod?: "auto" | "none" | "client_secret_basic" | "client_secret_post";
+  /** Optional client-owned HTTPS CIMD document. */
   readonly clientMetadataUrl?: string;
-  /** Fixed loopback callback listed exactly in the hosted CIMD document. */
+  /** Optional fixed loopback callback; required when using a hosted CIMD document. */
   readonly oauthRedirectUri?: string;
   readonly command: string;
   readonly args: readonly string[];
   readonly url: string;
   /** Target environment variable -> source variable in the service environment. */
   readonly envRefs: Readonly<Record<string, string>>;
-  /** Header templates may contain ${ENV_VAR}; never persist literal credentials. */
+  /** Ordinary values or ${ENV_VAR} references; credentials use separate local storage. */
   readonly headers: Readonly<Record<string, string>>;
 }
 
@@ -59,13 +65,26 @@ function enabled(value: unknown): boolean {
 
 export function parseMcpConnection(value: unknown): McpConnectionConfig {
   const input = object(value);
-  if (input.transport !== "stdio" && input.transport !== "http") throw new Error("MCP transport must be stdio or http");
+  if (input.transport !== "stdio" && input.transport !== "http" && input.transport !== "sse") throw new Error("MCP transport must be stdio, http or sse");
   const transport = input.transport;
   const auth = input.auth ?? "none";
-  if (auth !== "none" && auth !== "oauth") throw new Error("Invalid MCP auth mode");
-  if (auth === "oauth" && transport !== "http") throw new Error("OAuth requires HTTP");
-  // Missing fields in older configs remain editable; login explicitly requires
-  // both. Reading configuration must not make the desktop fail to boot.
+  if (!["none", "bearer", "api_key", "oauth"].includes(String(auth))) throw new Error("Invalid MCP auth mode");
+  if (auth !== "none" && transport === "stdio") throw new Error("stdio credentials must use environment variables");
+  const reference = (value: unknown, fallback: string) => {
+    const name = value === undefined ? fallback : text(value, "credential reference", 128);
+    if (!/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(name)) throw new Error("Invalid credential reference");
+    return name;
+  };
+  const credentialRef = auth === "bearer" || auth === "api_key" ? reference(input.credentialRef, "MCP_TOKEN") : undefined;
+  const apiKeyHeader = auth === "api_key" ? text(input.apiKeyHeader ?? "X-API-Key", "API Key Header", 128) : undefined;
+  if (apiKeyHeader && (!/^[A-Za-z0-9-]+$/.test(apiKeyHeader) || /^(host|cookie|set-cookie|content-length|connection|accept|content-type)$/i.test(apiKeyHeader))) throw new Error("Invalid API Key Header");
+  const oauthClientId = auth === "oauth" && input.oauthClientId ? text(input.oauthClientId, "OAuth Client ID", 2048) : undefined;
+  const oauthClientSecretRef = auth === "oauth" && input.oauthClientSecretRef ? reference(input.oauthClientSecretRef, "OAUTH_CLIENT_SECRET") : undefined;
+  const oauthScopes = auth === "oauth" && input.oauthScopes ? text(input.oauthScopes, "OAuth scopes", 2048) : undefined;
+  const oauthTokenAuthMethod = auth === "oauth" ? input.oauthTokenAuthMethod ?? "auto" : undefined;
+  if (oauthTokenAuthMethod && !["auto", "none", "client_secret_basic", "client_secret_post"].includes(String(oauthTokenAuthMethod))) throw new Error("Invalid OAuth token authentication method");
+  // Older configs remain editable. CIMD requires an exact callback at login;
+  // pre-registered clients and DCR can use an automatically allocated port.
   const clientMetadataUrl = auth === "oauth" && input.clientMetadataUrl ? text(input.clientMetadataUrl, "CIMD document URL", 2048) : "";
   const oauthRedirectUri = auth === "oauth" && input.oauthRedirectUri ? text(input.oauthRedirectUri, "OAuth callback URL", 2048) : "";
   if (clientMetadataUrl) {
@@ -87,23 +106,29 @@ export function parseMcpConnection(value: unknown): McpConnectionConfig {
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || typeof value !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) throw new Error("MCP envRefs must map variable names to variable names, not secret values");
     return [key, value];
   }));
-  const headers = Object.fromEntries(Object.entries(object(transport === "http" ? input.headers ?? {} : {})).map(([key, value]) => {
+  const headers = Object.fromEntries(Object.entries(object(transport !== "stdio" ? input.headers ?? {} : {})).map(([key, value]) => {
     if (!/^[A-Za-z0-9-]+$/.test(key) || typeof value !== "string" || value.length > 4096 || /[\r\n]/.test(value)
-      || !/\$\{[A-Za-z_][A-Za-z0-9_]*\}/.test(value)
-      || /^(host|cookie|set-cookie|content-length|connection)$/i.test(key)) throw new Error("MCP headers must use ${ENV_VAR} references; reserved headers are not allowed");
+      || /^(host|cookie|set-cookie|content-length|connection)$/i.test(key)) throw new Error("Invalid MCP Header name or value");
     return [key, value];
   }));
   if (Object.keys(envRefs).length > 100 || Object.keys(headers).length > 32) throw new Error("Too many MCP environment references or headers");
-  if (auth === "oauth" && Object.keys(headers).some(key => key.toLowerCase() === "authorization")) throw new Error("OAuth must not override Authorization headers");
+  if (new Set(Object.keys(headers).map(name => name.toLowerCase())).size !== Object.keys(headers).length) throw new Error("Duplicate MCP Header names");
+  const authHeader = auth === "oauth" || auth === "bearer" ? "authorization" : apiKeyHeader?.toLowerCase();
+  if (authHeader && Object.keys(headers).some(key => key.toLowerCase() === authHeader)) throw new Error("Authentication Header must not be duplicated in extra Headers");
   const command = transport === "stdio" ? text(input.command, "MCP executable") : "";
-  const url = transport === "http" ? text(input.url, "MCP URL") : "";
+  const url = transport !== "stdio" ? text(input.url, "MCP URL") : "";
   if (url) {
     const parsed = new URL(url);
     if (parsed.username || parsed.password || parsed.hash || parsed.search) throw new Error("MCP URL must not contain credentials, query parameters or a fragment");
     if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname))) throw new Error("MCP requires HTTPS, except for loopback HTTP");
   }
   return { id: id(input.id), name: text(input.name ?? input.id, "MCP name", 128), enabled: enabled(input.enabled), transport,
-    ...(auth === "oauth" ? { auth, ...(clientMetadataUrl ? { clientMetadataUrl } : {}), ...(oauthRedirectUri ? { oauthRedirectUri } : {}) } : {}), command, args: transport === "stdio" ? [...args] : [], url, envRefs, headers };
+    ...(auth !== "none" ? { auth: auth as NonNullable<McpConnectionConfig["auth"]> } : {}),
+    ...(credentialRef ? { credentialRef } : {}), ...(apiKeyHeader ? { apiKeyHeader } : {}),
+    ...(auth === "oauth" ? { ...(clientMetadataUrl ? { clientMetadataUrl } : {}), ...(oauthRedirectUri ? { oauthRedirectUri } : {}),
+      ...(oauthClientId ? { oauthClientId } : {}), ...(oauthClientSecretRef ? { oauthClientSecretRef } : {}), ...(oauthScopes ? { oauthScopes } : {}),
+      oauthTokenAuthMethod: oauthTokenAuthMethod as NonNullable<McpConnectionConfig["oauthTokenAuthMethod"]> } : {}),
+    command, args: transport === "stdio" ? [...args] : [], url, envRefs, headers };
 }
 
 export function parseExtensions(value: unknown): ExtensionConfiguration {

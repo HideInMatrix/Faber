@@ -133,9 +133,12 @@ export const desktopApi = {
   createPiSkill: (id: string, description: string, instructions: string) => call<boolean>('create_pi_skill', id, description, instructions),
   previewPiSkillImport: (path: string, replaceSourceId?: string) => call<PiSkillImportPreviewDto>('preview_pi_skill_import', path, ...(replaceSourceId === undefined ? [] : [replaceSourceId])),
   importPiSkills: (path: string, selection: string[], replaceSourceId?: string) => call<number>('import_pi_skills', path, selection, ...(replaceSourceId === undefined ? [] : [replaceSourceId])),
-  testPiMcp: (connection: PiMcpConnectionDto) => call<{ tools: string[] }>('test_pi_mcp', connection),
+  testPiMcp: (connection: PiMcpConnectionDto, updates: Record<string,string|null> = {}) => call<{ tools: string[] }>('test_pi_mcp', connection, updates),
+  piMcpCredentials: (id: string) => call<Record<string,string>>('get_pi_mcp_credentials', id),
+  savePiMcpConnection: (connection: PiMcpConnectionDto, updates: Record<string,string|null>) => call<boolean>('save_pi_mcp_connection', connection, updates),
   setPiMcpCredentials: (id: string, updates: Record<string, string | null>) => call<boolean>('set_pi_mcp_credentials', id, updates),
   loginPiMcp: (id: string) => call<{ url: string }>('login_pi_mcp', id),
+  loginPiMcpDraft: (connection: PiMcpConnectionDto, updates: Record<string,string|null>) => call<{url:string}>('login_pi_mcp_draft',connection,updates),
   cancelPiMcpLogin: (id: string) => call<boolean>('cancel_pi_mcp_login', id),
   logoutPiMcp: (id: string) => call<boolean>('logout_pi_mcp', id),
   refreshPiMcp: (id: string) => call<boolean>('refresh_pi_mcp', id),
@@ -148,7 +151,7 @@ export const desktopApi = {
   },
   logs: (after = 0) => call<{ cursor: number; entries: LogEntryDto[] }>('get_logs', after),
   clearLogs: () => call<number>('clear_logs'),
-  savedRuntimeSecrets: () => isTauri() ? invoke<SavedRuntimeSecrets>('runtime_saved_secrets') : Promise.resolve(null),
+  savedRuntimeSecrets: () => call<SavedRuntimeSecrets>('get_runtime_secrets'),
   async showPermissionPrompt(): Promise<void> {
     if (isTauri()) await invoke('show_permission_prompt')
   },

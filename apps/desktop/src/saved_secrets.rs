@@ -13,8 +13,8 @@ fn first(env: &HashMap<String, String>, keys: &[&str]) -> Option<String> {
   keys.iter().find_map(|key| env.get(*key).map(|value| value.trim()).filter(|value| !value.is_empty()).map(str::to_owned))
 }
 
-// Native-only, fixed configuration path: no caller-selected file and no HTTP
-// endpoint exporting credentials. The UI keeps these in memory, masked by default.
+// Native fallback uses a fixed configuration path, never a caller-selected file.
+// The local configuration UI displays these values as plain text.
 pub fn read(file: &Path, env: &HashMap<String, String>) -> Result<SavedSecrets, String> {
   let disk: Value = match fs::read_to_string(file) {
     Ok(text) => serde_json::from_str(&text).map_err(|_| "无法读取已保存的密钥：配置格式错误")?,

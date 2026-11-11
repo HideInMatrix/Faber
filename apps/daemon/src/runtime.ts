@@ -146,9 +146,10 @@ export class RuntimeSupervisor implements RuntimeControl {
   #exitReason = "";
   #networkWarning = "";
   readonly #mcpAuth: McpAuthStore;
+  readonly #mcpDraftAuth = new Map<string,McpAuthStore>();
   readonly #mcpControllers = new Map<string, McpExtensionController>();
   readonly #mcpCatalogs = new Map<string, readonly string[]>();
-  readonly #mcpHealth = new Map<string, { status: string; message: string; discoveredAt: number }>();
+  readonly #mcpHealth = new Map<string, { status: string; message: string; discoveredAt: number; toolCount?: number }>();
 
   constructor(config: DaemonConfig, logger: PluginLogger) {
     this.#cloudflared = new CloudflaredUpdater(config.configFile);
@@ -189,9 +190,9 @@ export class RuntimeSupervisor implements RuntimeControl {
       skills: this.#host ? loadedSkills(this.#host.loader).map(({ filePath: _path, ...skill }) => skill) : [],
       extensionHostActive: Boolean(this.#host),
       mcpStatus: Object.fromEntries(parseExtensions(this.#config.extensions).mcp.map(connection => {
-        const authentication = this.#mcpAuth.summary(connection);
+        const authentication = (this.#mcpDraftAuth.get(connection.id) ?? this.#mcpAuth).summary(connection);
         const health = this.#mcpHealth.get(connection.id) ?? { status: "stopped", message: "", discoveredAt: 0 };
-        return [connection.id, { ...authentication, ...health, message: health.message || authentication.message }];
+        return [connection.id, { ...authentication, ...health, toolCount: this.#mcpCatalogs.get(connection.id)?.length ?? health.toolCount ?? 0, message: authentication.message || health.message }];
       })),
       tools: this.#registry.listTools().map((tool) => ({
         name: tool.name,
@@ -354,6 +355,7 @@ export class RuntimeSupervisor implements RuntimeControl {
     // lifecycle queue; desktop exit cannot leave an initializing npx tree alive.
     this.#stopGeneration++;
     this.#mcpAuth.cancelPending();
+    for (const store of this.#mcpDraftAuth.values()) store.cancelPending();
     this.#startingAbort?.abort();
     this.#host?.cancel();
     this.approval.resetSession();
@@ -376,6 +378,7 @@ export class RuntimeSupervisor implements RuntimeControl {
       for (const result of results) if (result.status === "rejected") throw result.reason;
       if (this.#failureCleanup) await this.#traceStop("failure_cleanup", this.#failureCleanup);
       this.#mcpAuth.cancelPending();
+      for (const store of this.#mcpDraftAuth.values()) store.cancelPending();
       this.#exitReason = "";
       if (!this.#running) {
         this.approval.resetSession();
@@ -457,6 +460,8 @@ export class RuntimeSupervisor implements RuntimeControl {
   async dispose(): Promise<void> {
     await this.stop();
     this.#mcpAuth.close();
+    for (const store of this.#mcpDraftAuth.values()) store.close();
+    this.#mcpDraftAuth.clear();
     this.approval.dispose();
     await this.#registry.dispose();
   }
@@ -506,26 +511,28 @@ export class RuntimeSupervisor implements RuntimeControl {
     });
   }
 
-  async testMcpConnection(value: McpConnectionConfig): Promise<{ tools: readonly string[] }> {
+  async testMcpConnection(value: McpConnectionConfig, updates: unknown = {}): Promise<{ tools: readonly string[] }> {
     return this.#exclusive(async () => {
       this.#assertExtensionsEditable();
       const config = parseExtensions({ mcp: [value] }).mcp[0]!;
-      if (config.auth === "oauth" && this.#mcpAuth.summary(config).oauth === "pending") throw new Error("Complete or cancel OAuth login before testing");
-      const connection = new McpConnection(config, this.#mcpOptions(config));
+      const store=this.#mcpDraftAuth.get(config.id) ?? this.#mcpAuth;
+      if (config.auth === "oauth" && store.summary(config).oauth === "pending") throw new Error("Complete or cancel OAuth login before testing");
+      const connection = new McpConnection(config, { ...this.#mcpOptions(config), values: store.temporaryValues(config, updates),
+        ...(config.auth === "oauth" ? {authProvider:store.provider(config,undefined,store.temporaryValues(config,updates))} : {}) });
       this.#testingMcp = connection;
       try {
         const tools = (await connection.connect(this.#config.workspace)).map(tool => tool.name);
-        this.#mcpHealth.set(config.id, { status: "tested", message: "Test passed; temporary connection closed", discoveredAt: Date.now() });
+        this.#mcpHealth.set(config.id, { status: "tested", message: `连接成功，发现 ${tools.length} 个工具；测试连接已关闭。`, discoveredAt: Date.now(), toolCount: tools.length });
         return { tools };
       } catch (error) {
-        this.#mcpHealth.set(config.id, { status: "test_failed", message: "Connection test failed; check credentials, login and executable path", discoveredAt: 0 });
+        this.#mcpHealth.set(config.id, { status: "test_failed", message: error instanceof Error ? error.message : "Connection test failed", discoveredAt: 0 });
         throw error;
       } finally { await connection.close(); if (this.#testingMcp === connection) this.#testingMcp = undefined; }
     });
   }
 
   #mcpOptions(config: McpConnectionConfig): McpOptions {
-    return { values: this.#mcpAuth.values(config), ...(this.#startingAbort ? { signal: this.#startingAbort.signal } : {}), ...(config.transport === "http" ? { fetch: this.#mcpAuth.fetchMcp } : {}),
+    return { values: this.#mcpAuth.values(config), ...(this.#startingAbort ? { signal: this.#startingAbort.signal } : {}), ...(config.transport !== "stdio" ? { fetch: this.#mcpAuth.fetchMcp } : {}),
       ...(config.auth === "oauth" ? { authProvider: this.#mcpAuth.provider(config) } : {}),
       ...(config.id === "computer_use" ? { onResult: (name, result) => {
         try {
@@ -550,12 +557,51 @@ export class RuntimeSupervisor implements RuntimeControl {
   async setMcpCredentials(id: string, updates: unknown): Promise<void> {
     return this.#exclusive(async () => { this.#assertExtensionsEditable(); this.#mcpAuth.update(this.#connection(id), updates); });
   }
+  readMcpCredentials(id: string): Readonly<Record<string,string>> { return this.#mcpAuth.readValues(this.#connection(id)); }
+  runtimeSecrets() {
+    return { oauth_password: this.#config.oauthPassword ?? "", provider: this.#config.network.provider,
+      options: Object.fromEntries(Object.entries(this.#config.network.options).filter(([name]) => /token|secret|password|key/i.test(name))) };
+  }
+  async saveMcpConnection(value: McpConnectionConfig, updates: unknown): Promise<void> {
+    return this.#exclusive(async () => {
+      this.#assertExtensionsEditable();
+      if (this.#failureCleanup) await this.#failureCleanup;
+      const connection = parseExtensions({mcp:[value]}).mcp[0]!;
+      if (connection.id === "computer_use") throw new Error("computer_use is reserved for the built-in plugin");
+      const pending=this.#mcpDraftAuth.get(connection.id);
+      if (pending?.summary(connection).oauth === "pending") throw new Error("请先完成或取消 OAuth 授权，再保存配置。");
+      const previous = parseExtensions(this.#config.extensions);
+      const extensions = parseExtensions({...previous,mcp:[...previous.mcp.filter(item => item.id !== connection.id),connection]});
+      await this.#mcpAuth.withUpdates(connection,updates,async () => {
+        try {
+          await this.#saveExtensions(extensions);
+          const draft=this.#mcpDraftAuth.get(connection.id);
+          if (draft) this.#mcpAuth.adoptSession(connection,draft);
+        } catch (error) {
+          await this.#saveExtensions(previous); throw error;
+        }
+      });
+      this.#mcpDraftAuth.get(connection.id)?.close(); this.#mcpDraftAuth.delete(connection.id);
+    });
+  }
+  async beginMcpDraftLogin(value: McpConnectionConfig, updates: unknown): Promise<{url:string}> {
+    return this.#exclusive(async () => {
+      this.#assertExtensionsEditable();
+      const config=parseExtensions({mcp:[value]}).mcp[0]!;
+      this.#mcpDraftAuth.get(config.id)?.close();
+      const store=new McpAuthStore(`${this.#config.configFile}.oauth-draft-${crypto.randomUUID()}`,false);
+      store.update(config,this.#mcpAuth.temporaryValues(config,updates));
+      store.adoptSession(config,this.#mcpAuth);
+      this.#mcpDraftAuth.set(config.id,store);
+      return store.begin(config);
+    });
+  }
   async beginMcpLogin(id: string): Promise<{ url: string }> {
     return this.#exclusive(async () => { this.#assertExtensionsEditable(); return this.#mcpAuth.begin(this.#connection(id)); });
   }
-  async cancelMcpLogin(id: string): Promise<void> { this.#mcpAuth.cancel(id); }
+  async cancelMcpLogin(id: string): Promise<void> { this.#mcpAuth.cancel(id); this.#mcpDraftAuth.get(id)?.close(); this.#mcpDraftAuth.delete(id); }
   async logoutMcp(id: string): Promise<void> {
-    return this.#exclusive(async () => { this.#assertExtensionsEditable(); this.#mcpAuth.logout(this.#connection(id)); });
+    return this.#exclusive(async () => { this.#assertExtensionsEditable(); this.#mcpDraftAuth.get(id)?.close(); this.#mcpDraftAuth.delete(id); this.#mcpAuth.logout(this.#connection(id)); });
   }
   async refreshMcpTools(id: string): Promise<void> {
     return this.#exclusive(async () => {

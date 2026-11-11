@@ -67,7 +67,7 @@ export interface RuntimeSnapshot {
   readonly extensions?: ExtensionConfiguration;
   readonly skills?: readonly { readonly id: string; readonly name: string; readonly description: string; readonly disableModelInvocation: boolean }[];
   readonly extensionHostActive?: boolean;
-  readonly mcpStatus?: Readonly<Record<string, { keys: string[]; oauth: string; status: string; message: string; discoveredAt: number }>>;
+  readonly mcpStatus?: Readonly<Record<string, { keys: string[]; oauth: string; status: string; message: string; discoveredAt: number; toolCount?: number }>>;
 }
 
 export interface RuntimeConfigurationUpdate {
@@ -123,7 +123,11 @@ export interface RuntimeControl {
   configureExtensions?(value: ExtensionConfiguration): Promise<void>;
   createSkill?(id: string, description: string, instructions: string): Promise<void>;
   setMcpCredentials?(id: string, updates: unknown): Promise<void>;
+  readMcpCredentials?(id: string): Readonly<Record<string, string>>;
+  saveMcpConnection?(value: McpConnectionConfig, updates: unknown): Promise<void>;
+  runtimeSecrets?(): { oauth_password: string; provider: string; options: Readonly<Record<string,string>> };
   beginMcpLogin?(id: string): Promise<{ url: string }>;
+  beginMcpDraftLogin?(value: McpConnectionConfig, updates: unknown): Promise<{url:string}>;
   cancelMcpLogin?(id: string): Promise<void>;
   logoutMcp?(id: string): Promise<void>;
   refreshMcpTools?(id: string): Promise<void>;
@@ -131,7 +135,7 @@ export interface RuntimeControl {
   skillSourceDiagnostics?(): Promise<readonly { path: string; message: string }[]>;
   readSkill?(id: string): Promise<{ id: string; document: string; revision: string; files: readonly { path: string; size: number }[] }>;
   editSkill?(id: string, document: string, revision: string): Promise<void>;
-  testMcpConnection?(value: McpConnectionConfig): Promise<{ readonly tools: readonly string[] }>;
+  testMcpConnection?(value: McpConnectionConfig, updates?: unknown): Promise<{ readonly tools: readonly string[] }>;
 }
 
 export interface CloudflaredStatus {

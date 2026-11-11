@@ -241,13 +241,25 @@ export class DesktopCommandRouter {
       }
       case "test_pi_mcp":
         if (!this.#options.runtime.testMcpConnection) throw new Error("Pi MCP connection testing unavailable");
-        return this.#options.runtime.testMcpConnection(parseMcpConnection(request.args[0]));
+        return this.#options.runtime.testMcpConnection(parseMcpConnection(request.args[0]), request.args[1] ?? {});
+      case "get_pi_mcp_credentials":
+        if (!this.#options.runtime.readMcpCredentials) throw new Error("MCP credential management unavailable");
+        return this.#options.runtime.readMcpCredentials(String(request.args[0] ?? ""));
+      case "save_pi_mcp_connection":
+        if (!this.#options.runtime.saveMcpConnection) throw new Error("MCP connection management unavailable");
+        await this.#options.runtime.saveMcpConnection(parseMcpConnection(request.args[0]), request.args[1] ?? {}); return true;
+      case "get_runtime_secrets":
+        if (!this.#options.runtime.runtimeSecrets) throw new Error("Runtime configuration unavailable");
+        return this.#options.runtime.runtimeSecrets();
       case "set_pi_mcp_credentials":
         if (!this.#options.runtime.setMcpCredentials) throw new Error("MCP credential management unavailable");
         await this.#options.runtime.setMcpCredentials(String(request.args[0] ?? ""), request.args[1]); return true;
       case "login_pi_mcp":
         if (!this.#options.runtime.beginMcpLogin) throw new Error("MCP OAuth unavailable");
         return this.#options.runtime.beginMcpLogin(String(request.args[0] ?? ""));
+      case "login_pi_mcp_draft":
+        if (!this.#options.runtime.beginMcpDraftLogin) throw new Error("MCP OAuth unavailable");
+        return this.#options.runtime.beginMcpDraftLogin(parseMcpConnection(request.args[0]),request.args[1] ?? {});
       case "cancel_pi_mcp_login":
         await this.#options.runtime.cancelMcpLogin?.(String(request.args[0] ?? "")); return true;
       case "logout_pi_mcp":

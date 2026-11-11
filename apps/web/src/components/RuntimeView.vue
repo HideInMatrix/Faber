@@ -31,7 +31,6 @@ const manager = useRuntimeManager()
     <RuntimeEditor
       v-if="manager.ready.value"
       v-model:draft="manager.draft.value"
-      v-model:tunnel-token-visible="manager.tunnelTokenVisible.value"
       :locked="manager.locked.value"
       :busy="manager.busy.value"
       :lifecycle-busy="manager.lifecycleBusy.value"
@@ -40,9 +39,7 @@ const manager = useRuntimeManager()
       :copied-url="manager.copiedUrl.value"
       :runtime-url="manager.runtimeUrl.value"
       :network-providers="manager.networkProviders.value"
-      :oauth-password-visible="manager.oauthPasswordVisible.value"
       @choose-workspace="manager.chooseWorkspace"
-      @toggle-o-auth-password="manager.oauthPasswordVisible.value = !manager.oauthPasswordVisible.value"
       @copy-url="manager.copyUrl"
       @save="manager.saveRuntime"
       @toggle-running="manager.toggleRunning"
