@@ -12,7 +12,7 @@ if (realpathSync(computerUsePackageRoot) !== path.resolve(computerUsePackageRoot
 }
 export const computerUseRequire = createRequire(path.join(computerUsePackageRoot, 'package.json'))
 const computerUsePackage = JSON.parse(readFileSync(path.join(computerUsePackageRoot, 'package.json'), 'utf8'))
-if (computerUsePackage.name !== '@hideinmatrix/computer-use' || computerUsePackage.version !== '0.9.0'
+if (computerUsePackage.name !== '@hideinmatrix/computer-use' || computerUsePackage.version !== '0.9.3'
   || computerUsePackage.repository?.url !== 'git+https://github.com/HideInMatrix/computer-use.git') {
   throw new Error('Unexpected Computer Use package; review native/API/resource contracts before upgrading')
 }
@@ -49,5 +49,9 @@ export const computerUseNoticeSources = [
   ['third_party/asil/NOTICE', 'ASIL_NOTICE.txt'],
   ['third_party/automation/QUICKJS_LICENSE', 'QUICKJS_LICENSE.txt'],
   ['third_party/automation/PLAYWRIGHT_LICENSE', 'PLAYWRIGHT_LICENSE.txt'],
+  ['third_party/capitaine/COPYING', 'CAPITAINE_COPYING.txt'],
+  ['third_party/capitaine/GPL-3.0', 'CAPITAINE_GPL_3_0.txt'],
+  ['third_party/capitaine/NOTICE', 'CAPITAINE_NOTICE.txt'],
+  ['third_party/capitaine/default.svg', 'CAPITAINE_DEFAULT.svg'],
   ...(existsSync(path.join(computerUsePackageRoot,computerUseRdpFile)) ? computerUseRdpNotices.map((source,index)=>[source,['FREERDP_LICENSE.txt','OPENSSL_LICENSE.txt','ZLIB_LICENSE.txt'][index]]) : []),
 ].map(([source, name]) => [path.join(computerUsePackageRoot, source), name])

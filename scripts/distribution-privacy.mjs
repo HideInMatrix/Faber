@@ -20,7 +20,8 @@ export function filesIn(directory, prefix = '') {
 
 const notices = ['LICENSE', 'THIRD_PARTY_NOTICES.md', 'third_party/asil/LICENSE',
   'third_party/asil/DATA_LICENSE', 'third_party/asil/NOTICE',
-  'third_party/automation/QUICKJS_LICENSE', 'third_party/automation/PLAYWRIGHT_LICENSE']
+  'third_party/automation/QUICKJS_LICENSE', 'third_party/automation/PLAYWRIGHT_LICENSE',
+  'third_party/capitaine/COPYING', 'third_party/capitaine/GPL-3.0', 'third_party/capitaine/NOTICE', 'third_party/capitaine/default.svg']
 export const computerUseRdpFile = 'binaries/x86_64-pc-windows-msvc/development/computer-use-rdp.dll'
 export const computerUseRdpNotices = ['third_party/rdp/FreeRDP-LICENSE', 'third_party/rdp/OpenSSL-LICENSE', 'third_party/rdp/zlib-LICENSE']
 const macPrefix = 'binaries/(?:aarch64|x86_64)-apple-darwin/development/micromatrix Computer Use Dev\\.app/Contents/'
@@ -35,7 +36,7 @@ export function assertComputerUsePackage(directory) {
   if (hasRdp) required.push(computerUseRdpFile, ...computerUseRdpNotices)
   for (const file of required) if (!files.includes(file)) throw new Error(`Computer Use package missing: ${file}`)
   const pkg = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8'))
-  if (pkg.name !== '@hideinmatrix/computer-use' || pkg.version !== '0.9.0'
+  if (pkg.name !== '@hideinmatrix/computer-use' || pkg.version !== '0.9.3'
     || pkg.repository?.url !== 'git+https://github.com/HideInMatrix/computer-use.git'
     || pkg.scripts || pkg.devDependencies
     || Object.keys(pkg.exports ?? {}).sort().join('|') !== '.|./package.json') {
