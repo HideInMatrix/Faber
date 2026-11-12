@@ -2,6 +2,9 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
+import { Trash2 } from '@lucide/vue'
+import { FormField, FormGrid } from '@/components/ui/form'
+import { InputGroup, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { desktopApi } from '../../api/desktop'
 import { t } from '../../composables/useLocale'
 import type { PiMcpConnectionDto } from '../../types'
@@ -13,7 +16,6 @@ const draft = ref<PiMcpConnectionDto>(initial ? JSON.parse(JSON.stringify(initia
   id: `mcp_${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`, name: '', enabled: true,
   transport: 'http', auth: 'none', command: '', args: [], url: '', envRefs: {}, headers: {}, oauthTokenAuthMethod: 'auto',
 })
-const fieldClass = 'mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-xs outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50'
 const busy = ref(false), loading = ref(false), loadError = ref(''), error = ref('')
 const values = ref<Record<string,string|null>>(Object.create(null))
 const token = ref(''), clientSecret = ref(''), tokenCleared = ref(false), secretCleared = ref(false)
@@ -147,51 +149,52 @@ onUnmounted(() => { disposed = true; if (draftLogin && !saved) void desktopApi.c
     <p v-if="locked" class="mb-3 text-xs text-muted-foreground">{{ t('请先停止 Runtime，再编辑或测试服务。') }}</p>
     <p v-if="loading" class="mb-3 text-xs text-muted-foreground">{{ t('正在读取已保存的配置…') }}</p>
     <div v-if="loadError" class="mb-3 text-xs"><p role="alert" class="text-destructive">{{ loadError }}</p><Button size="sm" variant="outline" @click="load">{{ t('重新加载配置') }}</Button></div>
-    <fieldset :disabled="locked || busy || loading || Boolean(loadError)" class="space-y-3 disabled:opacity-60">
-      <label class="block text-xs">{{ t('名称') }}<input v-model="draft.name" :class="fieldClass" :placeholder="t('文档服务')" type="text" /></label>
-      <label class="block text-xs">{{ t('传输') }}<select v-model="draft.transport" :class="fieldClass"><option value="http">Streamable HTTP</option><option value="sse">{{ t('HTTP + SSE（旧版）') }}</option><option value="stdio">{{ t('stdio · 本地子进程') }}</option></select></label>
-      <template v-if="remote">
-        <label class="block text-xs">{{ t('MCP 地址') }}<input v-model="draft.url" type="text" :class="fieldClass" placeholder="https://example.com/mcp" /></label>
-        <label class="block text-xs">{{ t('认证') }}<select v-model="draft.auth" :class="fieldClass"><option value="none">{{ t('无认证') }}</option><option value="bearer">Bearer Token</option><option value="api_key">API Key</option><option value="oauth">{{ t('OAuth 浏览器授权') }}</option></select></label>
-        <label v-if="draft.auth === 'api_key'" class="block text-xs">{{ t('密钥 Header 名称') }}<input v-model="draft.apiKeyHeader" type="text" :class="fieldClass" placeholder="X-API-Key" /></label>
-        <div v-if="draft.auth === 'bearer' || draft.auth === 'api_key'" class="flex items-end gap-2">
-          <label class="flex-1 text-xs">{{ draft.auth === 'bearer' ? 'Token' : 'API Key' }}<input v-model="token" type="text" autocomplete="off" :class="fieldClass" :placeholder="t('填写自己的服务密钥')" @input="tokenCleared = false" /></label>
-          <Button size="sm" variant="outline" @click="token = ''; tokenCleared = true">{{ t('清除') }}</Button>
-        </div>
-        <template v-if="draft.auth === 'oauth'">
-          <p class="text-xs leading-5 text-muted-foreground">{{ t('自动发现授权方式。已有客户端可填写下面的信息；无需统一托管 CIMD 文档。') }}</p>
-          <details class="text-xs"><summary class="cursor-pointer">{{ t('OAuth 客户端配置（按服务要求填写）') }}</summary><div class="mt-3 space-y-3">
-          <label class="block text-xs">Client ID {{ t('（可选）') }}<input v-model="draft.oauthClientId" type="text" :class="fieldClass" /></label>
-          <div class="flex items-end gap-2"><label class="flex-1 text-xs">Client Secret {{ t('（可选）') }}<input v-model="clientSecret" type="text" autocomplete="off" :class="fieldClass" @input="secretCleared = false" /></label><Button size="sm" variant="outline" @click="clientSecret = ''; secretCleared = true">{{ t('清除') }}</Button></div>
-          <label class="block text-xs">{{ t('OAuth 回调地址（可选）') }}<input v-model="draft.oauthRedirectUri" type="text" :class="fieldClass" placeholder="http://127.0.0.1:18456/oauth/callback" /></label>
-          <label class="block text-xs">{{ t('授权范围（可选）') }}<input v-model="draft.oauthScopes" type="text" :class="fieldClass" placeholder="files:read" /></label>
-          <label class="block text-xs">{{ t('客户端认证方式') }}<select v-model="draft.oauthTokenAuthMethod" :class="fieldClass"><option value="auto">{{ t('自动选择') }}</option><option value="none">none</option><option value="client_secret_basic">client_secret_basic</option><option value="client_secret_post">client_secret_post</option></select></label>
-          <label class="block text-xs">{{ t('CIMD 文档 URL（可选）') }}<input v-model="draft.clientMetadataUrl" type="text" :class="fieldClass" placeholder="https://your-domain.example/oauth/client.json" /></label>
-          </div></details>
-          <Button size="sm" variant="outline" @click="perform('login')">{{ t('授权登录') }}</Button>
+    <fieldset :disabled="locked || busy || loading || Boolean(loadError)" class="disabled:opacity-60">
+      <FormGrid>
+        <FormField :label="t('名称')" span="2"><input v-model="draft.name" :placeholder="t('文档服务')" type="text" /></FormField>
+        <FormField :label="t('传输')" :span="remote ? '1' : '2'"><select v-model="draft.transport"><option value="http">Streamable HTTP</option><option value="sse">{{ t('HTTP + SSE（旧版）') }}</option><option value="stdio">{{ t('stdio · 本地子进程') }}</option></select></FormField>
+        <template v-if="remote">
+          <FormField :label="t('认证')"><select v-model="draft.auth"><option value="none">{{ t('无认证') }}</option><option value="bearer">Bearer Token</option><option value="api_key">API Key</option><option value="oauth">{{ t('OAuth 浏览器授权') }}</option></select></FormField>
+          <FormField :label="t('MCP 地址')" span="2"><input v-model="draft.url" type="text" placeholder="https://example.com/mcp" /></FormField>
+          <FormField v-if="draft.auth === 'api_key'" :label="t('密钥 Header 名称')" span="2"><input v-model="draft.apiKeyHeader" type="text" placeholder="X-API-Key" /></FormField>
+          <FormField v-if="draft.auth === 'bearer' || draft.auth === 'api_key'" :label="draft.auth === 'bearer' ? 'Token' : 'API Key'" span="2">
+            <InputGroup><InputGroupInput v-model="token" type="text" autocomplete="off" :placeholder="t('填写自己的服务密钥')" @update:model-value="tokenCleared = false" /><InputGroupButton :aria-label="t('清除')" @click="token = ''; tokenCleared = true"><Trash2 :size="15" /></InputGroupButton></InputGroup>
+          </FormField>
+          <div v-if="draft.auth === 'oauth'" class="col-span-2 space-y-3">
+            <p class="text-xs leading-5 text-muted-foreground">{{ t('自动发现授权方式。已有客户端可填写下面的信息；无需统一托管 CIMD 文档。') }}</p>
+            <details class="text-xs"><summary class="cursor-pointer">{{ t('OAuth 客户端配置（按服务要求填写）') }}</summary><FormGrid class="mt-3">
+              <FormField :label="'Client ID ' + t('（可选）')" span="2"><input v-model="draft.oauthClientId" type="text" /></FormField>
+              <FormField :label="'Client Secret ' + t('（可选）')" span="2"><InputGroup><InputGroupInput v-model="clientSecret" type="text" autocomplete="off" @update:model-value="secretCleared = false" /><InputGroupButton :aria-label="t('清除')" @click="clientSecret = ''; secretCleared = true"><Trash2 :size="15" /></InputGroupButton></InputGroup></FormField>
+              <FormField :label="t('OAuth 回调地址（可选）')" span="2"><input v-model="draft.oauthRedirectUri" type="text" placeholder="http://127.0.0.1:18456/oauth/callback" /></FormField>
+              <FormField :label="t('授权范围（可选）')"><input v-model="draft.oauthScopes" type="text" placeholder="files:read" /></FormField>
+              <FormField :label="t('客户端认证方式')"><select v-model="draft.oauthTokenAuthMethod"><option value="auto">{{ t('自动选择') }}</option><option value="none">none</option><option value="client_secret_basic">client_secret_basic</option><option value="client_secret_post">client_secret_post</option></select></FormField>
+              <FormField :label="t('CIMD 文档 URL（可选）')" span="2"><input v-model="draft.clientMetadataUrl" type="text" placeholder="https://your-domain.example/oauth/client.json" /></FormField>
+            </FormGrid></details>
+            <Button size="sm" variant="outline" @click="perform('login')">{{ t('授权登录') }}</Button>
+          </div>
+          <div v-if="!advanced" class="col-span-2 space-y-2">
+            <span class="text-[11px] font-medium">{{ t('额外 Header') }}</span>
+            <InputGroup v-for="(row,index) in headers" :key="index"><InputGroupInput v-model="row.name" :aria-label="t('Header 名称')" placeholder="Header" type="text" /><InputGroupInput v-model="row.value" :aria-label="t('Header 值')" class="border-l border-input" type="text" /><InputGroupButton :aria-label="t('移除')" @click="row.reference && removedEnv.add(row.reference); headers.splice(index,1)"><Trash2 :size="15" /></InputGroupButton></InputGroup>
+            <Button variant="outline" size="sm" @click="headers.push({name:'',value:'',reference:''})">{{ t('添加 Header') }}</Button>
+          </div>
         </template>
-        <div v-if="!advanced" class="space-y-2">
-          <span class="text-xs">{{ t('额外 Header') }}</span>
-          <div v-for="(row,index) in headers" :key="index" class="flex items-end gap-2"><input v-model="row.name" :aria-label="t('Header 名称')" :class="fieldClass" placeholder="Header" type="text" /><input v-model="row.value" :aria-label="t('Header 值')" :class="fieldClass" type="text" /><Button variant="outline" size="sm" @click="row.reference && removedEnv.add(row.reference); headers.splice(index,1)">{{ t('移除') }}</Button></div>
-          <Button variant="outline" size="sm" @click="headers.push({name:'',value:'',reference:''})">{{ t('添加 Header') }}</Button>
-        </div>
-      </template>
-      <template v-else>
-        <label class="block text-xs">{{ t('可执行程序') }}<input v-model="draft.command" :class="fieldClass" type="text" :placeholder="t('npx 或绝对路径（不是 shell 命令）')" /></label>
-        <template v-if="!advanced">
-          <div class="space-y-2"><span class="text-xs">{{ t('启动参数') }}</span><div v-for="(row,index) in args" :key="index" class="flex items-end gap-2"><input v-model="row.value" :aria-label="t('参数值')" :class="fieldClass" type="text" /><Button variant="outline" size="sm" @click="args.splice(index,1)">{{ t('移除') }}</Button></div><Button variant="outline" size="sm" @click="args.push({value:''})">{{ t('添加参数') }}</Button></div>
-          <div class="space-y-2"><span class="text-xs">{{ t('环境变量') }}</span><div v-for="(row,index) in env" :key="index" class="flex items-end gap-2"><input v-model="row.name" :aria-label="t('环境变量名称')" :class="fieldClass" placeholder="API_KEY" type="text" /><input v-model="row.value" :aria-label="t('环境变量值')" :class="fieldClass" :placeholder="row.reference ? '${' + row.reference + '}' : t('值')" type="text" /><Button variant="outline" size="sm" @click="row.reference && removedEnv.add(row.reference); env.splice(index,1)">{{ t('移除') }}</Button></div><Button variant="outline" size="sm" @click="env.push({name:'',value:'',reference:''})">{{ t('添加环境变量') }}</Button></div>
+        <template v-else>
+          <FormField :label="t('可执行程序')" span="2"><input v-model="draft.command" type="text" :placeholder="t('npx 或绝对路径（不是 shell 命令）')" /></FormField>
+          <template v-if="!advanced">
+            <div class="col-span-2 space-y-2"><span class="text-[11px] font-medium">{{ t('启动参数') }}</span><InputGroup v-for="(row,index) in args" :key="index"><InputGroupInput v-model="row.value" :aria-label="t('参数值')" type="text" /><InputGroupButton :aria-label="t('移除')" @click="args.splice(index,1)"><Trash2 :size="15" /></InputGroupButton></InputGroup><Button variant="outline" size="sm" @click="args.push({value:''})">{{ t('添加参数') }}</Button></div>
+            <div class="col-span-2 space-y-2"><span class="text-[11px] font-medium">{{ t('环境变量') }}</span><InputGroup v-for="(row,index) in env" :key="index"><InputGroupInput v-model="row.name" :aria-label="t('环境变量名称')" placeholder="API_KEY" type="text" /><InputGroupInput v-model="row.value" :aria-label="t('环境变量值')" class="border-l border-input" :placeholder="row.reference ? '${' + row.reference + '}' : t('值')" type="text" /><InputGroupButton :aria-label="t('移除')" @click="row.reference && removedEnv.add(row.reference); env.splice(index,1)"><Trash2 :size="15" /></InputGroupButton></InputGroup><Button variant="outline" size="sm" @click="env.push({name:'',value:'',reference:''})">{{ t('添加环境变量') }}</Button></div>
+          </template>
         </template>
-      </template>
-      <details class="text-xs"><summary class="cursor-pointer">{{ t('高级配置') }}</summary><div class="mt-3 space-y-3">
-        <label class="block">ID<input v-model="draft.id" :disabled="Boolean(initial)" :class="fieldClass" type="text" /></label>
-        <label class="flex items-center gap-2"><input type="checkbox" :checked="advanced" @change="toggleAdvanced" />{{ t('使用高级 JSON 配置') }}</label>
-        <template v-if="advanced"><label v-if="!remote" class="block">{{ t('参数 JSON 数组') }}<textarea v-model="argsJson" :class="[fieldClass,'h-20 py-2 font-mono']" /></label><label v-if="!remote" class="block">{{ t('环境变量引用 JSON') }}<textarea v-model="envJson" :class="[fieldClass,'h-20 py-2 font-mono']" /></label><label v-if="remote" class="block">{{ t('Header 引用 JSON') }}<textarea v-model="headersJson" :class="[fieldClass,'h-20 py-2 font-mono']" /></label></template>
-      </div></details>
-      <div v-for="reference in referenceNames" :key="reference" class="flex items-end gap-2"><label class="flex-1 text-xs">{{ reference }}<input v-model="values[reference]" type="text" autocomplete="off" :class="fieldClass" :placeholder="t('留空保留 / 使用服务环境变量')" /></label><Button variant="outline" size="sm" @click="values[reference] = null">{{ t('清除') }}</Button></div>
-      <p v-if="error" role="alert" class="whitespace-pre-wrap break-words text-xs text-destructive">{{ error }}</p>
-      <div v-if="result" role="status" class="rounded-lg border border-border p-3 text-xs"><p>{{ t('发现 {value0} 个工具。',{value0:result.length}) }}</p><ul class="mt-2 max-h-40 overflow-auto font-mono"><li v-for="name in result" :key="name">{{ name }}</li></ul></div>
-      <div class="flex justify-end gap-2"><Button size="sm" variant="outline" @click="emit('cancel')">{{ t('取消') }}</Button><Button size="sm" variant="outline" @click="perform('test')">{{ busy ? t('处理中…') : t('测试连接') }}</Button><Button size="sm" @click="perform('save')">{{ t('保存配置') }}</Button></div>
+        <details class="col-span-2 text-xs"><summary class="cursor-pointer">{{ t('高级配置') }}</summary><FormGrid class="mt-3">
+          <FormField label="ID" span="2"><input v-model="draft.id" :disabled="Boolean(initial)" type="text" /></FormField>
+          <label class="col-span-2 flex items-center gap-2"><input type="checkbox" :checked="advanced" @change="toggleAdvanced" />{{ t('使用高级 JSON 配置') }}</label>
+          <template v-if="advanced"><FormField v-if="!remote" :label="t('参数 JSON 数组')" span="2"><textarea v-model="argsJson" class="h-20" /></FormField><FormField v-if="!remote" :label="t('环境变量引用 JSON')" span="2"><textarea v-model="envJson" class="h-20" /></FormField><FormField v-if="remote" :label="t('Header 引用 JSON')" span="2"><textarea v-model="headersJson" class="h-20" /></FormField></template>
+        </FormGrid></details>
+        <FormField v-for="reference in referenceNames" :key="reference" :label="reference" span="2"><InputGroup><InputGroupInput :model-value="values[reference] ?? ''" type="text" autocomplete="off" :placeholder="t('留空保留 / 使用服务环境变量')" @update:model-value="values[reference] = $event" /><InputGroupButton :aria-label="t('清除')" @click="values[reference] = null"><Trash2 :size="15" /></InputGroupButton></InputGroup></FormField>
+      </FormGrid>
+      <p v-if="error" role="alert" class="mt-3 whitespace-pre-wrap break-words text-xs text-destructive">{{ error }}</p>
+      <div v-if="result" role="status" class="mt-3 rounded-md border border-input p-3 text-xs"><p>{{ t('发现 {value0} 个工具。',{value0:result.length}) }}</p><ul class="mt-2 max-h-40 overflow-auto font-mono"><li v-for="name in result" :key="name">{{ name }}</li></ul></div>
+      <div class="mt-4 flex justify-end gap-2 border-t border-border pt-3.5"><Button size="sm" variant="outline" @click="emit('cancel')">{{ t('取消') }}</Button><Button size="sm" variant="outline" @click="perform('test')">{{ busy ? t('处理中…') : t('测试连接') }}</Button><Button size="sm" @click="perform('save')">{{ t('保存配置') }}</Button></div>
     </fieldset>
   </section>
 </template>

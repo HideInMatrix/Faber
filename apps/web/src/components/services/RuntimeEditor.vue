@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { t } from '../../composables/useLocale'
 
-import { computed } from 'vue'
-import { Check, Copy, FolderOpen, Play, RotateCcw, Square, Trash2 } from '@lucide/vue'
+import { computed, ref } from 'vue'
+import { Check, Copy, Eye, EyeOff, FolderOpen, Play, RotateCcw, Square, Trash2 } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { CheckField, FormField, FormGrid } from '@/components/ui/form'
 import { InputGroup, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
@@ -10,6 +10,8 @@ import type { NetworkProviderDto, RuntimeDraft } from '../../types'
 import PermissionModeField from './PermissionModeField.vue'
 
 const draft = defineModel<RuntimeDraft>('draft', { required: true })
+const tunnelTokenVisible = ref(false)
+const oauthPasswordVisible = ref(false)
 
 const props = defineProps<{
   locked: boolean
@@ -118,11 +120,16 @@ const emit = defineEmits<{
             <InputGroupInput
               :model-value="draft.network.options[field.key]"
               :disabled="locked || draft.network.secret_actions[field.key] === 'clear'"
-              type="text"
-              autocomplete="off"
+              :type="tunnelTokenVisible ? 'text' : 'password'"
+              autocomplete="new-password"
               :placeholder="t('留空则保留现有值')"
               @update:model-value="updateNetworkSecret(field.key, $event)"
             />
+            <InputGroupButton
+              :aria-label="tunnelTokenVisible ? t('隐藏网络密钥') : t('显示网络密钥')"
+              :aria-pressed="tunnelTokenVisible"
+              @click="tunnelTokenVisible = !tunnelTokenVisible"
+            ><EyeOff v-if="tunnelTokenVisible" :size="15" /><Eye v-else :size="15" /></InputGroupButton>
             <InputGroupButton
               :disabled="locked || (!secretConfigured(field.key) && !draft.network.options[field.key])"
               :aria-label="draft.network.secret_actions[field.key] === 'clear' ? t('撤销清除网络密钥') : t('清除网络密钥')"
@@ -160,11 +167,16 @@ const emit = defineEmits<{
             <InputGroupInput
               :model-value="draft.oauth_password"
               :disabled="locked || draft.oauth_password_action === 'clear'"
-              type="text"
-              autocomplete="off"
+              :type="oauthPasswordVisible ? 'text' : 'password'"
+              autocomplete="new-password"
               :placeholder="t('留空则保留现有值')"
               @update:model-value="updateOAuthPassword"
             />
+            <InputGroupButton
+              :aria-label="oauthPasswordVisible ? t('隐藏 OAuth 密码') : t('显示 OAuth 密码')"
+              :aria-pressed="oauthPasswordVisible"
+              @click="oauthPasswordVisible = !oauthPasswordVisible"
+            ><EyeOff v-if="oauthPasswordVisible" :size="15" /><Eye v-else :size="15" /></InputGroupButton>
             <InputGroupButton
               :disabled="locked || (!draft.oauth_password_configured && !draft.oauth_password)"
               :aria-label="draft.oauth_password_action === 'clear' ? t('撤销清除 OAuth 密码') : t('清除 OAuth 密码')"
