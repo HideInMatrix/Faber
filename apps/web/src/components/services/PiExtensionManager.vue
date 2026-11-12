@@ -42,7 +42,7 @@ function connectionStatus(id: string) {
   const status = state.value?.mcp_status?.[id]
   if (status?.oauth === 'pending') return t('待授权')
   if (status?.oauth === 'failed') return t('授权失败')
-  return t(({ stopped: '未连接', connecting: '连接中', connected: '已连接', disconnected: '连接已断开', tested: '测试通过', test_failed: '测试失败', error: '连接失败' } as Record<string,string>)[status?.status ?? 'stopped'] ?? '未连接')
+  return t(({ stopped: '未连接', connecting: '连接中', reconnecting: '正在重连', connected: '已连接', disconnected: '连接已断开', tested: '测试通过', test_failed: '测试失败', error: '连接失败' } as Record<string,string>)[status?.status ?? 'stopped'] ?? '未连接')
 }
 
 async function refresh() {
@@ -134,7 +134,7 @@ defineExpose({ refresh: () => action(async () => {}) })
     <div v-for="connection in state?.configuration.mcp ?? []" :key="`mcp:${connection.id}`" class="flex flex-wrap items-center gap-2 px-4 py-3">
         <div class="min-w-0 basis-40 flex-1"><div class="text-sm font-medium">{{ connection.name }}</div><div class="mt-1 truncate text-xs text-muted-foreground">MCP · {{ connection.id }} · {{ connection.transport }} · {{ connection.url || connection.command }}</div></div>
         <div class="max-w-lg text-xs text-muted-foreground">{{ connectionStatus(connection.id) }}<span v-if="connection.auth === 'oauth'"> · {{ state?.mcp_status?.[connection.id]?.oauth === 'authorized' ? t('已授权') : t('需要授权') }}</span><span v-if="['connected','tested'].includes(state?.mcp_status?.[connection.id]?.status ?? '')"> · {{ t('{value0} 个工具', { value0: state?.mcp_status?.[connection.id]?.toolCount ?? 0 }) }}</span><div class="mt-1 break-words">{{ state?.mcp_status?.[connection.id]?.message }}</div></div>
-        <Button v-if="state?.running && connection.enabled" size="sm" variant="ghost" :disabled="busy" @click="refreshTools(connection.id)">{{ t("刷新工具") }}</Button>
+        <Button v-if="state?.running && connection.enabled" size="sm" variant="ghost" :disabled="busy" @click="refreshTools(connection.id)">{{ ['disconnected','reconnecting','error'].includes(state?.mcp_status?.[connection.id]?.status ?? '') ? t("重新连接") : t("刷新工具") }}</Button>
         <template v-if="connection.auth === 'oauth'">
           <Button size="sm" variant="ghost" :disabled="busy || state?.running" @click="oauth(connection.id)">{{ t("授权登录") }}</Button>
           <Button size="sm" variant="ghost" :disabled="busy || state?.running" @click="logout(connection.id)">{{ t("注销") }}</Button>

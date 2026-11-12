@@ -3,6 +3,8 @@ export const LOCALE_STORAGE_KEY = 'faber-interface-language'
 
 // Default/fallback messages stay Chinese. Raw logs and user content are not translated.
 export const englishMessages: Readonly<Record<string, string>> = {
+  '正在重连': 'Reconnecting',
+  '重新连接': 'Reconnect',
   "名称不能重复。": "Names must be unique.",
   "请填写服务名称。": "Enter a service name.",
   "环境变量": "Environment variables",

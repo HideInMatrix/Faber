@@ -1,6 +1,6 @@
 import spawn from "cross-spawn";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
-import { ReadBuffer, serializeMessage } from "@modelcontextprotocol/sdk/shared/stdio.js";
+import { ReadBuffer, serializeMessage, STDIO_DEFAULT_MAX_BUFFER_SIZE } from "@modelcontextprotocol/sdk/shared/stdio.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 
@@ -10,7 +10,9 @@ export class OwnedStdioTransport implements Transport {
   onerror?: (error: Error) => void;
   onmessage?: (message: JSONRPCMessage) => void;
   #process: ChildProcessWithoutNullStreams | undefined;
-  #buffer = new ReadBuffer({ maxBufferSize: 4 * 1024 * 1024 });
+  #buffer = new ReadBuffer(); // Retain the SDK's bounded 10 MiB per-message limit.
+  #reason = "";
+  get closeReason(): string { return this.#reason; }
   #closing: Promise<void> | undefined;
   #started = false;
   constructor(readonly command: string, readonly args: readonly string[], readonly env: Record<string, string>, readonly cwd: string) {}
@@ -21,13 +23,26 @@ export class OwnedStdioTransport implements Transport {
       stdio: "pipe", shell: false, windowsHide: true, detached: process.platform !== "win32" });
     this.#process = child;
     child.stderr.on("data", () => {}); // Never log upstream secrets.
+    child.once("error", error => {
+      const code = (error as NodeJS.ErrnoException).code;
+      this.#reason = code === "ENOENT" ? "本地 MCP 启动失败：找不到程序，请检查可执行程序和 PATH。"
+        : code === "EACCES" ? "本地 MCP 启动失败：程序没有执行权限。" : "本地 MCP 子进程启动失败，请检查程序和环境变量。";
+    });
     child.stdin.on("error", error => this.onerror?.(error));
     child.stdout.on("error", error => this.onerror?.(error));
     child.stdout.on("data", (chunk: Buffer) => {
       try { this.#buffer.append(chunk); let message; while ((message = this.#buffer.readMessage()) !== null) this.onmessage?.(message); }
-      catch (error) { this.onerror?.(error as Error); void this.close(); }
+      catch (error) {
+        this.#reason = error instanceof Error && error.message.includes("ReadBuffer exceeded maximum size")
+          ? `本地 MCP 响应超过 ${STDIO_DEFAULT_MAX_BUFFER_SIZE / 1024 / 1024} MiB，请缩小请求的数据范围（如 Figma 节点范围或读取深度）。`
+          : "本地 MCP 输出了无效的 JSON-RPC 数据；请确认使用 stdio 模式且普通日志写入 stderr。";
+        this.onerror?.(new Error(this.#reason)); void this.close();
+      }
     });
-    child.once("exit", () => { void this.close(); }); // Clean descendants even when their parent exits first.
+    child.once("exit", (code, signal) => {
+      if (!this.#closing) this.#reason = `本地 MCP 子进程退出（退出码 ${code ?? "无"}，信号 ${signal ?? "无"}）。`;
+      void this.close(); // Clean descendants even when their parent exits first.
+    });
     child.once("close", () => this.onclose?.());
     await new Promise<void>((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
   }

@@ -548,7 +548,10 @@ export class RuntimeSupervisor implements RuntimeControl {
           }
         } catch { /* untrusted/malformed tool content is not a permission proof */ }
       } } satisfies Pick<McpOptions,"onResult"> : {}),
-      onStatus: (status, message) => this.#mcpHealth.set(config.id, { status, message, discoveredAt: status === "connected" ? Date.now() : this.#mcpHealth.get(config.id)?.discoveredAt ?? 0 }) };
+      onStatus: (status, message) => {
+        this.#mcpHealth.set(config.id, { status, message, discoveredAt: status === "connected" ? Date.now() : this.#mcpHealth.get(config.id)?.discoveredAt ?? 0 });
+        if (status === "disconnected" || status === "reconnecting") this.#logger.log("warn", "MCP connection interrupted", {id:config.id,transport:config.transport,status,reason:message});
+      } };
   }
   #connection(id: string): McpConnectionConfig {
     const config = parseExtensions(this.#config.extensions).mcp.find(connection => connection.id === id);

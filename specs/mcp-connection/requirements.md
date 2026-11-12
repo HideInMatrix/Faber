@@ -70,7 +70,9 @@
 
 ### R6. 无需显隐操作
 
-本次统一范围：第三方 MCP 地址、API Key、Bearer Token、环境变量值、普通 Header 值、Client ID、Client Secret、CIMD 文档地址、OAuth 回调地址，以及 Runtime 配置中的网络令牌与 OAuth 密码。
+本次统一范围仅限插件：第三方 MCP 地址、API Key、Bearer Token、环境变量值、普通 Header 值、Client ID、Client Secret、CIMD 文档地址、OAuth 回调地址。
+
+2026-11-12 用户修正：Runtime 网络令牌和 OAuth 密码恢复默认隐藏及眼睛按钮；插件继续明文，两处使用相同表单、输入框及清除按钮样式。
 
 - 当用户新增、编辑、保存或重新打开上述配置时，相关输入框应直接明文展示，不使用 password 类型、不显示星号，也不要求点击眼睛按钮才能查看。
 - 当用户打开已保存的配置时，Faber 应回显实际保存的手填值，而不只显示“已配置”或一个空白替换框。
