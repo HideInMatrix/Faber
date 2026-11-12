@@ -14,8 +14,9 @@ const emit = defineEmits<{ saved: []; cancel: [] }>()
 const initial = props.connection
 const draft = ref<PiMcpConnectionDto>(initial ? JSON.parse(JSON.stringify(initial)) as PiMcpConnectionDto : {
   id: `mcp_${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`, name: '', enabled: true,
-  transport: 'http', auth: 'none', command: '', args: [], url: '', envRefs: {}, headers: {}, oauthTokenAuthMethod: 'auto',
+  startup: 'on_demand', description: '', transport: 'http', auth: 'none', command: '', args: [], url: '', envRefs: {}, headers: {}, oauthTokenAuthMethod: 'auto',
 })
+draft.value.startup ??= 'on_start'
 const busy = ref(false), loading = ref(false), loadError = ref(''), error = ref('')
 const values = ref<Record<string,string|null>>(Object.create(null))
 const token = ref(''), clientSecret = ref(''), tokenCleared = ref(false), secretCleared = ref(false)
@@ -59,7 +60,7 @@ function configuration(): PiMcpConnectionDto {
   if (!d.name.trim()) throw new Error(t('请填写服务名称。'))
   if (props.connections.some(c => c.id === d.id && c.id !== initial?.id)) throw new Error(t('MCP ID 已存在'))
   if (d.id === 'computer_use') throw new Error(t('Computer Use 已内置，请使用上方开关，不要添加重复服务。'))
-  return { ...d, name: d.name.trim(), auth: remote.value ? d.auth ?? 'none' : 'none',
+  return { ...d, description: d.description?.trim() || '', name: d.name.trim(), auth: remote.value ? d.auth ?? 'none' : 'none',
     credentialRef: d.credentialRef || 'MCP_TOKEN', apiKeyHeader: d.apiKeyHeader || 'X-API-Key',
     args: remote.value ? [] : advanced.value ? JSON.parse(argsJson.value) as string[] : args.value.map(row => row.value),
     envRefs: remote.value ? {} : advanced.value ? JSON.parse(envJson.value) as Record<string,string>
@@ -152,6 +153,8 @@ onUnmounted(() => { disposed = true; if (draftLogin && !saved) void desktopApi.c
     <fieldset :disabled="locked || busy || loading || Boolean(loadError)" class="disabled:opacity-60">
       <FormGrid>
         <FormField :label="t('名称')" span="2"><input v-model="draft.name" :placeholder="t('文档服务')" type="text" /></FormField>
+        <FormField :label="t('启动方式')" span="2"><select v-model="draft.startup"><option value="on_demand">{{ t('按需启动') }}</option><option value="on_start">{{ t('随 Runtime 启动') }}</option></select><p class="mt-1 text-xs text-muted-foreground">{{ t('按需启动时，AI 先搜索能力，再连接所需服务；搜索本身不会启动服务。') }}</p></FormField>
+        <FormField :label="t('用途说明（可选）')" span="2"><textarea v-model="draft.description" maxlength="2048" :placeholder="t('例如：读取 Figma 设计稿、导出图片。首次连接前也能按用途搜索到服务。')" class="min-h-16" /></FormField>
         <FormField :label="t('传输')" :span="remote ? '1' : '2'"><select v-model="draft.transport"><option value="http">Streamable HTTP</option><option value="sse">{{ t('HTTP + SSE（旧版）') }}</option><option value="stdio">{{ t('stdio · 本地子进程') }}</option></select></FormField>
         <template v-if="remote">
           <FormField :label="t('认证')"><select v-model="draft.auth"><option value="none">{{ t('无认证') }}</option><option value="bearer">Bearer Token</option><option value="api_key">API Key</option><option value="oauth">{{ t('OAuth 浏览器授权') }}</option></select></FormField>

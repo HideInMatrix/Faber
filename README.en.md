@@ -63,6 +63,16 @@ Stop Runtime, open **Plugins → Skills → Add Skill**, select a local director
 
 Already configured files (including disabled entries) are skipped, and conflicting Skill names are marked in the preview. Compatibility warnings do not block other documents. Existing directory sources offer **Split directory**: confirmation replaces that reference with the selected independent entries; cancelling leaves it unchanged. Import only saves file references: it does not copy, delete or execute original files, or automatically load unconfigured global directories.
 
+## Discovering and connecting capabilities
+
+Use `capabilities_search` with a natural-language task to search configured MCP services and model-invocable Skills together. The result includes exact IDs, live availability and next steps. Search never starts a process or executes a business tool. Read a matched Skill through the returned `skills_read` arguments.
+
+New external MCP connections default to **On demand**; existing configurations retain **With Runtime**. Add an optional purpose description so a service can be found before its first connection. Successful tests and connections cache tool summaries beside the configuration in `.mcp-catalog.json`, bound to the connection identity without storing configuration credentials, addresses or startup arguments. Offline metadata is not callable.
+
+For an available connection hint, call `mcp_connect` with the returned `mcp:service_id`. Concurrent requests share initialization and connected sessions are reused. The response contains original tool names, full schemas and `schema_revision`. Clients that refresh tool lists can use native tools; clients with a fixed list can call `mcp_call` with the exact service ID, tool name, revision and business arguments. This gateway validates the current target and follows its actual approval policy without reconnecting or replaying calls.
+
+While Runtime is running, connect, pause or resume an external service from Plugins. `mcp_disconnect` also pauses a service. Pausing revokes tools and cancels connections/retries; AI cannot resume a user-paused service. Resume it explicitly in Faber. Pauses last for the current Runtime session; a full stop/start reapplies the saved startup mode. Built-in Computer Use retains its existing startup and permission flow.
+
 ## MCP tool names
 
 External MCP tools retain their original server-provided names, such as `computer_act` and `lanhu_get_design_overview`. Faber adds no service prefix, truncation or hash suffix. Names must be unique across all sources, including built-in tools; collisions produce an explicit error instead of overwriting another tool.

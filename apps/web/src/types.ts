@@ -137,6 +137,8 @@ export interface BodyPluginDto {
 }
 
 export interface PiMcpConnectionDto {
+  startup?: 'on_start' | 'on_demand'
+  description?: string
   id: string
   name: string
   enabled: boolean

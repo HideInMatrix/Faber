@@ -3,6 +3,8 @@ export interface McpConnectionConfig {
   readonly id: string;
   readonly name: string;
   readonly enabled: boolean;
+  readonly startup?: "on_start" | "on_demand";
+  readonly description?: string;
   readonly transport: "stdio" | "http" | "sse";
   readonly auth?: "none" | "bearer" | "api_key" | "oauth";
   readonly credentialRef?: string;
@@ -67,6 +69,9 @@ export function parseMcpConnection(value: unknown): McpConnectionConfig {
   const input = object(value);
   if (input.transport !== "stdio" && input.transport !== "http" && input.transport !== "sse") throw new Error("MCP transport must be stdio, http or sse");
   const transport = input.transport;
+  const startup = input.startup ?? "on_start";
+  if (startup !== "on_start" && startup !== "on_demand") throw new Error("Invalid MCP startup mode");
+  const description = input.description ? text(input.description,"MCP description",2048) : undefined;
   const auth = input.auth ?? "none";
   if (!["none", "bearer", "api_key", "oauth"].includes(String(auth))) throw new Error("Invalid MCP auth mode");
   if (auth !== "none" && transport === "stdio") throw new Error("stdio credentials must use environment variables");
@@ -122,7 +127,7 @@ export function parseMcpConnection(value: unknown): McpConnectionConfig {
     if (parsed.username || parsed.password || parsed.hash || parsed.search) throw new Error("MCP URL must not contain credentials, query parameters or a fragment");
     if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname))) throw new Error("MCP requires HTTPS, except for loopback HTTP");
   }
-  return { id: id(input.id), name: text(input.name ?? input.id, "MCP name", 128), enabled: enabled(input.enabled), transport,
+  return { id: id(input.id), name: text(input.name ?? input.id, "MCP name", 128), enabled: enabled(input.enabled), startup, ...(description ? {description} : {}), transport,
     ...(auth !== "none" ? { auth: auth as NonNullable<McpConnectionConfig["auth"]> } : {}),
     ...(credentialRef ? { credentialRef } : {}), ...(apiKeyHeader ? { apiKeyHeader } : {}),
     ...(auth === "oauth" ? { ...(clientMetadataUrl ? { clientMetadataUrl } : {}), ...(oauthRedirectUri ? { oauthRedirectUri } : {}),

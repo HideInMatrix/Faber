@@ -59,9 +59,11 @@ export class McpConnection {
   #refresh: Promise<readonly Tool[]> | undefined;
   #closing = false;
   #refreshAgain = false;
+  #discovered = false;
   #transport: OwnedStdioTransport | StreamableHTTPClientTransport | SSEClientTransport | undefined;
   #connected = false;
   get connected(): boolean { return this.#connected && !this.#closing; }
+  get tools(): readonly Tool[] { return [...this.#tools]; }
   constructor(config: McpConnectionConfig, options: McpOptions = {}) {
     this.config = config; this.options = options;
     this.client.setNotificationHandler(ToolListChangedNotificationSchema, async () => {
@@ -122,8 +124,9 @@ export class McpConnection {
     if (this.#refresh) return this.#refresh;
     const work = this.#discover().catch(error => {
       if (!this.#closing) {
-        this.#tools = []; this.options.onTools?.([]);
+        this.#tools = [];
         this.options.onStatus?.("error", "MCP tool discovery failed; old tools revoked. Refresh or reconnect");
+        this.options.onTools?.([]);
       }
       throw error;
     }); this.#refresh = work;
@@ -147,13 +150,13 @@ export class McpConnection {
     } while (cursor);
     if (this.#closing || !this.#connected) throw new Error("MCP closed during discovery");
     if (new Set(tools.map(tool => tool.name)).size !== tools.length) throw new Error("MCP server returned duplicate tool names");
-    if (JSON.stringify(tools) !== JSON.stringify(this.#tools)) { this.#tools = tools; this.options.onTools?.(tools); }
+    if (!this.#discovered || JSON.stringify(tools) !== JSON.stringify(this.#tools)) { this.#tools = tools; this.#discovered=true; this.options.onTools?.(tools); }
     this.options.onStatus?.("connected", "");
     return tools;
   }
 
   async call(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<CallToolResult> {
-    if (!this.#connected) throw new Error(`MCP ${this.config.id} disconnected; stop and start Runtime to reconnect`);
+    if (!this.#connected) throw new Error(`MCP ${this.config.id} disconnected; use capabilities_search to check current status before reconnecting`);
     if (!this.#tools.some(tool => tool.name === name)) throw new Error("MCP tool removed or discovery failed; refresh the tool list");
     const result = CallToolResultSchema.parse(await this.client.callTool({ name, arguments: args }, CallToolResultSchema,
       { timeout: 60_000, ...(signal ? { signal } : {}) }));
@@ -183,35 +186,55 @@ export interface McpOptions {
 function optionsAuth(options: McpOptions) {
   return { ...(options.authProvider ? { authProvider: options.authProvider } : {}), ...(options.fetch ? { fetch: options.fetch } : {}) };
 }
-export interface McpExtensionController { refresh(): Promise<readonly Tool[]>; close(): Promise<void> }
+export interface McpExtensionController {
+  start(): Promise<readonly Tool[]>;
+  pause(): Promise<void>;
+  refresh(): Promise<readonly Tool[]>;
+  close(): Promise<void>;
+}
 
-/** One Runtime-owned session. Reconnects discovery only, never replays tool calls. */
+/** Runtime-owned connection; pause is reversible, close permanently disposes it. */
 export class McpSession implements McpExtensionController {
   #connection: McpConnection | undefined;
   #opening: Promise<readonly Tool[]> | undefined;
+  #pausing: Promise<void> | undefined;
+  #closing: Promise<void> | undefined;
   #timer: ReturnType<typeof setTimeout> | undefined;
   readonly #abort = new AbortController();
+  #attemptAbort: AbortController | undefined;
   #closed = false;
+  #paused = false;
+  #generation = 0;
   #started = false;
   #attempt = 0;
   #connectedAt = 0;
   constructor(readonly config: McpConnectionConfig, readonly options: McpOptions, readonly workspace: string) {}
-  start(): Promise<readonly Tool[]> { return this.#open(); }
+  async start(): Promise<readonly Tool[]> {
+    const generation=this.#generation;
+    await this.#pausing;
+    if (this.#closed) throw new Error("MCP session closed");
+    if (generation!==this.#generation) throw new DOMException("MCP start superseded by pause","AbortError");
+    this.#paused=false; this.#attempt=0; clearTimeout(this.#timer); this.#timer=undefined;
+    return this.#connection?.connected ? this.#connection.tools : this.#open();
+  }
   #open(): Promise<readonly Tool[]> {
-    if (this.#closed) return Promise.reject(new Error("MCP session closed"));
+    if (this.#closed || this.#paused) return Promise.reject(new Error("MCP session closed or paused"));
     if (this.#opening) return this.#opening;
+    const generation=this.#generation, attemptAbort=new AbortController(); this.#attemptAbort=attemptAbort;
+    const active=()=>!this.#closed && !this.#paused && generation===this.#generation;
     const work = (async () => {
-      const previous = this.#connection; this.#connection = undefined;
+      const previous=this.#connection; this.#connection=undefined;
       await previous?.close(); this.#abort.signal.throwIfAborted();
+      if (!active()) throw new DOMException("MCP start cancelled","AbortError");
       let established=false;
       const candidate = new McpConnection(this.config, { ...this.options,
-        signal: this.options.signal ? AbortSignal.any([this.options.signal,this.#abort.signal]) : this.#abort.signal,
-        onTools: tools => { if (!this.#closed && this.#connection === candidate) this.options.onTools?.(tools); },
+        signal: AbortSignal.any([this.#abort.signal,attemptAbort.signal,...(this.options.signal ? [this.options.signal] : [])]),
+        onTools: tools => { if (active() && this.#connection===candidate) this.options.onTools?.(tools); },
         onStatus: (status,message) => {
-          if (this.#closed || this.#connection !== candidate) return;
+          if (!active() || this.#connection!==candidate) return;
           this.options.onStatus?.(status,message);
-          if (status === "disconnected" && established && this.#started) {
-            if (Date.now()-this.#connectedAt >= 60_000) this.#attempt=0;
+          if (status==="disconnected" && established && this.#started) {
+            if (Date.now()-this.#connectedAt>=60_000) this.#attempt=0;
             this.#schedule(message);
           }
         },
@@ -219,41 +242,56 @@ export class McpSession implements McpExtensionController {
       this.#connection=candidate;
       try {
         const tools=await candidate.connect(this.workspace);
-        if (this.#closed || !candidate.connected) throw new Error("MCP disconnected during initialization");
+        if (!active() || !candidate.connected) throw new Error("MCP disconnected during initialization");
         this.#connectedAt=Date.now(); this.#started=true; established=true;
         return tools;
-      } catch (error) { await candidate.close(); throw error; }
+      } catch (error) {
+        await candidate.close();
+        if(active()){
+          this.options.onStatus?.("error",error instanceof Error ? error.message : "MCP connection failed");
+          this.options.onTools?.([]);
+        }
+        throw error;
+      }
     })();
     this.#opening=work;
-    void work.finally(() => { if (this.#opening === work) this.#opening=undefined; }).catch(() => {});
+    void work.finally(()=>{if(this.#opening===work)this.#opening=undefined;}).catch(()=>{});
     return work;
   }
   #schedule(reason: string): void {
-    if (this.#closed || this.#timer || this.options.signal?.aborted || this.config.id === "computer_use") return;
-    if (this.#attempt >= 5) { this.options.onStatus?.("disconnected",`${reason} 已停止自动重连；点击“重新连接”重试。`); return; }
-    const attempt=++this.#attempt, delay=1000 * 2 ** (attempt-1);
+    if (this.#closed || this.#paused || this.#timer || this.options.signal?.aborted || this.config.id==="computer_use") return;
+    if (this.#attempt>=5) {this.options.onStatus?.("disconnected",`${reason} 已停止自动重连；点击“连接服务”重试。`);return;}
+    const attempt=++this.#attempt,delay=1000*2**(attempt-1),generation=this.#generation;
     this.options.onStatus?.("reconnecting",`${reason} ${delay/1000} 秒后重新连接（${attempt}/5）。`);
-    this.#timer=setTimeout(() => {
+    this.#timer=setTimeout(()=>{
       this.#timer=undefined;
-      void this.#open().catch(error => {
-        if (!this.#closed) this.#schedule(error instanceof Error ? error.message : "MCP 重连失败。");
-      });
-    },delay);
-    this.#timer.unref();
+      void this.#open().catch(error=>{if(!this.#closed && !this.#paused && generation===this.#generation)this.#schedule(error instanceof Error ? error.message : "MCP 重连失败。");});
+    },delay);this.#timer.unref();
   }
   async refresh(): Promise<readonly Tool[]> {
-    if (this.#closed) throw new Error("MCP session closed");
-    clearTimeout(this.#timer); this.#timer=undefined; this.#attempt=0;
+    if (this.#closed || this.#paused) throw new Error("MCP session closed or paused; resume it first");
+    clearTimeout(this.#timer);this.#timer=undefined;this.#attempt=0;
     return this.#connection?.connected ? this.#connection.refresh() : this.#open();
   }
-  call(name: string, args: Record<string,unknown>, signal?: AbortSignal): Promise<CallToolResult> {
-    if (this.#closed || !this.#connection?.connected) return Promise.reject(new Error(`MCP ${this.config.id} 已断开，正在恢复连接；请等待连接恢复后重新发起操作。`));
+  call(name: string,args: Record<string,unknown>,signal?:AbortSignal):Promise<CallToolResult>{
+    if(this.#closed || this.#paused || !this.#connection?.connected)return Promise.reject(new Error(`MCP ${this.config.id} 当前不可用，请使用 capabilities_search 重新搜索能力并确认连接状态。`));
     return this.#connection.call(name,args,signal);
   }
-  async close(): Promise<void> {
-    this.#closed=true; clearTimeout(this.#timer); this.#timer=undefined; this.#abort.abort();
-    await this.#connection?.close();
-    await this.#opening?.catch(() => {});
+  pause():Promise<void>{
+    this.#paused=true;this.#started=false;this.#generation++;this.#attempt=0;
+    clearTimeout(this.#timer);this.#timer=undefined;this.#attemptAbort?.abort();
+    if(this.#pausing)return this.#pausing;
+    const connection=this.#connection,opening=this.#opening;this.#connection=undefined;
+    const work=(async()=>{
+      try {this.options.onStatus?.(this.#closed ? "stopped" : "paused","");this.options.onTools?.([]);}
+      finally {await connection?.close();await opening?.catch(()=>{});}
+    })();this.#pausing=work;
+    void work.finally(()=>{if(this.#pausing===work)this.#pausing=undefined;}).catch(()=>{});
+    return work;
+  }
+  close():Promise<void>{
+    if(!this.#closing){this.#closed=true;this.#abort.abort();this.#closing=this.pause();}
+    return this.#closing;
   }
 }
 export function createMcpExtension(config: McpConnectionConfig, options: McpOptions = {},
@@ -282,6 +320,7 @@ export function createMcpExtension(config: McpConnectionConfig, options: McpOpti
     pi.on("session_start", async (_event, ctx) => {
       connection = new McpSession(config, { ...options, onTools: tools => { register(tools); options.onTools?.(tools); } },ctx.cwd);
       attach?.(connection);
+      if (config.startup === "on_demand") { options.onStatus?.("idle", ""); return; }
       try { await connection.start(); }
       catch (error) { options.onStatus?.("error", error instanceof Error ? error.message : "MCP connection failed"); throw error; }
     });

@@ -64,8 +64,8 @@ export function createSkillsExtension(sources: readonly SkillSourceConfig[], loa
       parameters: { type: "object", properties: { id: { type: "string" } }, required: ["id"], additionalProperties: false } as AgentTool["parameters"],
       async execute(_callId, params, signal) {
         const id = params && typeof params === "object" ? Reflect.get(params as object, "id") : undefined;
-        const skill = loadedSkills(loader).find((skill) => skill.id === id);
-        if (!skill) throw new Error("Unknown Pi Skill ID");
+        const skill = loadedSkills(loader).find((skill) => skill.id === id && !skill.disableModelInvocation);
+        if (!skill) throw new Error("Unknown or unavailable Pi Skill ID; use capabilities_search to discover current Skills");
         const path = resolve(skill.filePath);
         // No arbitrary read path in the tool API. Reject replaced symlinks and
         // files that grew beyond the bounded instruction-document size.
@@ -94,8 +94,8 @@ export function createSkillsExtension(sources: readonly SkillSourceConfig[], loa
       },
     });
     async function skillRoot(id: unknown): Promise<string> {
-      const skill = loadedSkills(loader).find(skill => skill.id === id);
-      if (!skill) throw new Error("Unknown Pi Skill ID");
+      const skill = loadedSkills(loader).find(skill => skill.id === id && !skill.disableModelInvocation);
+      if (!skill) throw new Error("Unknown or unavailable Pi Skill ID; use capabilities_search to discover current Skills");
       const path = resolve(skill.filePath);
       if (await realpath(path) !== registeredFiles.get(path)) throw new Error("Skill file path changed; reload Runtime");
       return dirname(registeredFiles.get(path)!);

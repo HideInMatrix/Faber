@@ -130,6 +130,8 @@ export interface RuntimeControl {
   beginMcpDraftLogin?(value: McpConnectionConfig, updates: unknown): Promise<{url:string}>;
   cancelMcpLogin?(id: string): Promise<void>;
   logoutMcp?(id: string): Promise<void>;
+  connectMcp?(id:string):Promise<unknown>;
+  pauseMcp?(id:string):Promise<unknown>;
   refreshMcpTools?(id: string): Promise<void>;
   skillDocuments?(): Promise<readonly { id: string; description: string }[]>;
   skillSourceDiagnostics?(): Promise<readonly { path: string; message: string }[]>;

@@ -3,6 +3,18 @@ export const LOCALE_STORAGE_KEY = 'faber-interface-language'
 
 // Default/fallback messages stay Chinese. Raw logs and user content are not translated.
 export const englishMessages: Readonly<Record<string, string>> = {
+  "启动方式": "Startup mode",
+  "按需启动": "On demand",
+  "随 Runtime 启动": "With Runtime",
+  "按需启动时，AI 先搜索能力，再连接所需服务；搜索本身不会启动服务。": "On demand: AI searches capabilities first, then connects the needed service. Search never starts services.",
+  "用途说明（可选）": "Purpose (optional)",
+  "例如：读取 Figma 设计稿、导出图片。首次连接前也能按用途搜索到服务。": "For example: read Figma designs and export images. Makes this service discoverable before its first connection.",
+  "待按需启动": "Waiting on demand",
+  "已暂停": "Paused",
+  "恢复连接": "Resume connection",
+  "连接服务": "Connect service",
+  "暂停服务": "Pause service",
+
   '正在重连': 'Reconnecting',
   '重新连接': 'Reconnect',
   "名称不能重复。": "Names must be unique.",

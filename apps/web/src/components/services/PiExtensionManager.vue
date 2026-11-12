@@ -27,6 +27,15 @@ const newSkillCandidates = computed(() => skillPreview.value?.candidates.filter(
 const skillImportCapacity = computed(() => Math.max(0, 100 - (state.value?.configuration.skills.length ?? 0) + (replacingSkillSource.value ? 1 : 0)))
 watch([skillPath, skillMode], () => { skillPreview.value = null; selectedSkills.value = [] }, { flush: 'sync' })
 async function refreshTools(id: string) { await action(async () => { await desktopApi.refreshPiMcp(id); toast.success(t("工具目录已刷新")) }) }
+const connecting = ref(new Set<string>())
+async function connect(id: string) {
+  if (busy.value || connecting.value.has(id)) return
+  connecting.value.add(id)
+  try { await Promise.all([desktopApi.connectPiMcp(id), refresh()]); await refresh(); emit('changed') }
+  catch (error) { toast.error(error instanceof Error ? error.message : String(error)); await refresh().catch(() => {}) }
+  finally { connecting.value.delete(id) }
+}
+async function pause(id: string) { await action(async () => { await desktopApi.pausePiMcp(id) }) }
 async function logout(id: string) { await action(async () => { await desktopApi.logoutPiMcp(id) }) }
 async function cancelLogin(id: string) { await action(async () => { await desktopApi.cancelPiMcpLogin(id) }) }
 async function oauth(id: string) {
@@ -42,7 +51,7 @@ function connectionStatus(id: string) {
   const status = state.value?.mcp_status?.[id]
   if (status?.oauth === 'pending') return t('待授权')
   if (status?.oauth === 'failed') return t('授权失败')
-  return t(({ stopped: '未连接', connecting: '连接中', reconnecting: '正在重连', connected: '已连接', disconnected: '连接已断开', tested: '测试通过', test_failed: '测试失败', error: '连接失败' } as Record<string,string>)[status?.status ?? 'stopped'] ?? '未连接')
+  return t(({ idle: '待按需启动', paused: '已暂停', stopped: '未连接', connecting: '连接中', reconnecting: '正在重连', connected: '已连接', disconnected: '连接已断开', tested: '测试通过', test_failed: '测试失败', error: '连接失败' } as Record<string,string>)[status?.status ?? 'stopped'] ?? '未连接')
 }
 
 async function refresh() {
@@ -132,9 +141,13 @@ defineExpose({ refresh: () => action(async () => {}) })
     <McpConnectionEditor v-if="form === 'mcp'" :key="editingMcp?.id || 'new'" :connection="editingMcp" :connections="state?.configuration.mcp ?? []" :locked="busy || Boolean(state?.running)" @saved="mcpSaved" @cancel="form = ''" />
     <div v-if="state" class="mt-3 divide-y divide-border rounded-xl border border-border bg-card">
     <div v-for="connection in state?.configuration.mcp ?? []" :key="`mcp:${connection.id}`" class="flex flex-wrap items-center gap-2 px-4 py-3">
-        <div class="min-w-0 basis-40 flex-1"><div class="text-sm font-medium">{{ connection.name }}</div><div class="mt-1 truncate text-xs text-muted-foreground">MCP · {{ connection.id }} · {{ connection.transport }} · {{ connection.url || connection.command }}</div></div>
+        <div class="min-w-0 basis-40 flex-1"><div class="text-sm font-medium">{{ connection.name }}<span class="ml-2 text-xs font-normal text-muted-foreground">{{ t(connection.startup === 'on_demand' ? '按需启动' : '随 Runtime 启动') }}</span></div><div class="mt-1 truncate text-xs text-muted-foreground">MCP · {{ connection.id }} · {{ connection.transport }} · {{ connection.url || connection.command }}</div></div>
         <div class="max-w-lg text-xs text-muted-foreground">{{ connectionStatus(connection.id) }}<span v-if="connection.auth === 'oauth'"> · {{ state?.mcp_status?.[connection.id]?.oauth === 'authorized' ? t('已授权') : t('需要授权') }}</span><span v-if="['connected','tested'].includes(state?.mcp_status?.[connection.id]?.status ?? '')"> · {{ t('{value0} 个工具', { value0: state?.mcp_status?.[connection.id]?.toolCount ?? 0 }) }}</span><div class="mt-1 break-words">{{ state?.mcp_status?.[connection.id]?.message }}</div></div>
-        <Button v-if="state?.running && connection.enabled" size="sm" variant="ghost" :disabled="busy" @click="refreshTools(connection.id)">{{ ['disconnected','reconnecting','error'].includes(state?.mcp_status?.[connection.id]?.status ?? '') ? t("重新连接") : t("刷新工具") }}</Button>
+        <template v-if="state?.running && connection.enabled">
+          <Button v-if="state?.mcp_status?.[connection.id]?.status === 'connected'" size="sm" variant="ghost" :disabled="busy" @click="refreshTools(connection.id)">{{ t('刷新工具') }}</Button>
+          <Button v-else-if="!['connecting','reconnecting'].includes(state?.mcp_status?.[connection.id]?.status ?? '')" size="sm" variant="ghost" :disabled="busy || connecting.has(connection.id) || (connection.auth === 'oauth' && state?.mcp_status?.[connection.id]?.oauth !== 'authorized')" @click="connect(connection.id)">{{ state?.mcp_status?.[connection.id]?.status === 'paused' ? t('恢复连接') : t('连接服务') }}</Button>
+          <Button v-if="connecting.has(connection.id) || ['connected','connecting','reconnecting'].includes(state?.mcp_status?.[connection.id]?.status ?? '')" size="sm" variant="ghost" :disabled="busy" @click="pause(connection.id)">{{ t('暂停服务') }}</Button>
+        </template>
         <template v-if="connection.auth === 'oauth'">
           <Button size="sm" variant="ghost" :disabled="busy || state?.running" @click="oauth(connection.id)">{{ t("授权登录") }}</Button>
           <Button size="sm" variant="ghost" :disabled="busy || state?.running" @click="logout(connection.id)">{{ t("注销") }}</Button>

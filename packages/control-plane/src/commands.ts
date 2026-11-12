@@ -125,10 +125,10 @@ function capability(tool: RuntimeTool) {
       required_capabilities: [],
       required_operation_permissions: [],
       annotations: {
-        read_only: tool.name === "read" || tool.name === "grep" || tool.name === "find" || tool.name === "ls",
+        read_only: tool.name === "read" || tool.name === "grep" || tool.name === "find" || tool.name === "ls" || tool.name === "capabilities_search",
         destructive: tool.name === "bash" || tool.name === "edit" || tool.name === "write",
         idempotent: false,
-        open_world: external || tool.name === "bash",
+        open_world: external || tool.name === "bash" || tool.pluginId === "mcp-management",
       },
       permission_boundary: "Pi tool plugin",
       approval_boundary: "MCP client and local policy",
@@ -265,6 +265,12 @@ export class DesktopCommandRouter {
       case "logout_pi_mcp":
         if (!this.#options.runtime.logoutMcp) throw new Error("MCP OAuth unavailable");
         await this.#options.runtime.logoutMcp(String(request.args[0] ?? "")); return true;
+      case "connect_pi_mcp":
+        if (!this.#options.runtime.connectMcp) throw new Error("MCP connection unavailable");
+        return this.#options.runtime.connectMcp(String(request.args[0] ?? ""));
+      case "pause_pi_mcp":
+        if (!this.#options.runtime.pauseMcp) throw new Error("MCP pause unavailable");
+        return this.#options.runtime.pauseMcp(String(request.args[0] ?? ""));
       case "refresh_pi_mcp":
         if (!this.#options.runtime.refreshMcpTools) throw new Error("MCP refresh unavailable");
         await this.#options.runtime.refreshMcpTools(String(request.args[0] ?? "")); return true;
