@@ -52,8 +52,9 @@ Go beyond reading and writing files: let AI operate your desktop and browser thr
 
 1. Stop Runtime and enable **Computer Use** on the **Plugins** page.
 2. On macOS, click **Configure permissions**, follow the prompts to grant Accessibility and Screen Recording permissions, then recheck the permission status. On Windows, use an interactive desktop session.
-3. For the browser channel, expand **Browser connection** and choose a managed separate window (installed Chrome / Edge, or separately prepared Playwright Chromium), then enter a dedicated session name and allowed websites. Existing CDP attach mode remains available. Managed mode keeps dedicated sign-in data in private application storage, not your everyday browser profile. Its window launches only on explicit browser discovery and approval; saving settings or starting Runtime does not launch it.
-4. Start Runtime and call the tools through an authorized MCP client. Control actions follow your current approval policy.
+3. For the browser channel, expand **Browser connection**, choose **Use current browser (recommended)** and Chrome / Edge, then click **Prepare browser extension**. Follow the instructions to load the unpacked extension; it connects automatically once installed. Save the configuration. Browser restarts and unexpected disconnects reconnect automatically, and the extension shows connection status and failures. This mode reuses the current browser and sign-in state, operates within the target tab without moving the system pointer or taking other windows' focus, and provides visible control indicators and stop/disconnect controls. Initial extension loading is manual; it is not listed in an extension store.
+4. Websites are unrestricted by default; enable the website restriction and fill in its list if needed. Managed separate windows and CDP attach mode remain available, and existing configurations retain their saved mode. Managed mode keeps dedicated sign-in data in private application storage; saving its configuration or starting Runtime does not open the managed window.
+5. Start Runtime and call the tools through an authorized MCP client. Control actions follow your current approval policy.
 
 Enabling Computer Use does not automatically start Runtime or a tunnel. Stop Runtime before changing the toggle or browser configuration.
 
@@ -62,6 +63,22 @@ Enabling Computer Use does not automatically start Runtime or a tunnel. Stop Run
 Stop Runtime, open **Plugins → Skills → Add Skill**, select a local directory or `SKILL.md`, then scan and select the documents to import. Each document gets an independent configuration: its ID defaults to the folder name, while the Skill keeps its document's `name`. Each can be toggled or removed separately; a single source ID for the entire root directory is no longer required.
 
 Already configured files (including disabled entries) are skipped, and conflicting Skill names are marked in the preview. Compatibility warnings do not block other documents. Existing directory sources offer **Split directory**: confirmation replaces that reference with the selected independent entries; cancelling leaves it unchanged. Import only saves file references: it does not copy, delete or execute original files, or automatically load unconfigured global directories.
+
+## Discovering and connecting capabilities
+
+Use `capabilities_search` with a natural-language task to search configured MCP services and model-invocable Skills together. The result includes exact IDs, live availability and next steps. Search never starts a process or executes a business tool. Read a matched Skill through the returned `skills_read` arguments.
+
+New external MCP connections default to **On demand**; existing configurations retain **With Runtime**. Add an optional purpose description so a service can be found before its first connection. Successful tests and connections cache tool summaries beside the configuration in `.mcp-catalog.json`, bound to the connection identity without storing configuration credentials, addresses or startup arguments. Offline metadata is not callable.
+
+For an available connection hint, call `mcp_connect` with the returned `mcp:service_id`. Concurrent requests share initialization and connected sessions are reused. The response contains original tool names, full schemas and `schema_revision`. Clients that refresh tool lists can use native tools; clients with a fixed list can call `mcp_call` with the exact service ID, tool name, revision and business arguments. This gateway validates the current target and follows its actual approval policy without reconnecting or replaying calls.
+
+While Runtime is running, connect, pause or resume an external service from Plugins. `mcp_disconnect` also pauses a service. Pausing revokes tools and cancels connections/retries; AI cannot resume a user-paused service. Resume it explicitly in Faber. Pauses last for the current Runtime session; a full stop/start reapplies the saved startup mode. Built-in Computer Use retains its existing startup and permission flow.
+
+## MCP tool names
+
+External MCP tools retain their original server-provided names, such as `computer_act` and `lanhu_get_design_overview`. Faber adds no service prefix, truncation or hash suffix. Names must be unique across all sources, including built-in tools; collisions produce an explicit error instead of overwriting another tool.
+
+After upgrading from older versions, stop and restart Runtime, then refresh the MCP client's tool list or reconnect the existing plugin. The server URL, OAuth authorization and upstream tools do not need changes. Fixed calls written with the old tool names must use the original names instead.
 
 ## Interface language
 
@@ -86,9 +103,13 @@ Legacy `outbound_proxy`, `health_route` and their environment variables are igno
 ### Development directories
 
 - `scripts/`: build, packaging, publication and release validation tools.
-- `diagnostics/`: manually invoked troubleshooting tools and investigation notes.
+- `diagnostics/`: manually invoked diagnostic sampling scripts.
 - `tests/`: local-only automated tests, ignored by Git. Test results and collected evidence are not committed either.
 
 `npm run check` runs type checks, the frontend build and distribution boundary validation without local test files. Developers who retain the local tests can use `npm run test:local`, which builds the service before running them. Fresh clones do not include the tests directory. CI retains build, release provenance, signing, distribution boundary and vulnerability checks, without running local-only tests.
 
 The root and `apps/daemon` pin the same Computer Use version so npm applies the Zod security override across workspace dependencies. Update both pins when upgrading the package; source boundary validation checks that they agree.
+
+See [Build and release validation](docs/packaging.md) (Simplified Chinese) for current build inputs, CI triggers and required validation files.
+
+For an unresponsive Windows desktop, manually run `powershell -NoProfile -File .\diagnostics\diagnose-windows-freeze.ps1 -DurationSeconds 1800` on Windows. Samples are written to `.local/diagnostics/`. The collector does not inject desktop input, take screenshots, terminate processes or upload data; collecting samples does not establish the root cause.

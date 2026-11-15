@@ -46,7 +46,7 @@ interface PendingApproval {
   readonly settle: (outcome: ApprovalOutcome) => void;
 }
 
-const READ_ONLY = new Set(["read", "grep", "find", "ls"]);
+const READ_ONLY = new Set(["read", "grep", "find", "ls", "capabilities_search"]);
 const WRITES = new Set(["edit", "write"]);
 const LOCAL_CONTEXT: ToolExecutionContext = Object.freeze({
   authentication: "anonymous",

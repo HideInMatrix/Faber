@@ -74,7 +74,7 @@ export interface RuntimeDraft {
   network: NetworkDraft
 }
 
-// Available only over the native Tauri bridge, never the HTTP/MCP API.
+// Local configuration UI only: native bridge or restricted loopback control API; never public MCP.
 export interface SavedRuntimeSecrets {
   oauth_password: string
   provider: string
@@ -137,11 +137,19 @@ export interface BodyPluginDto {
 }
 
 export interface PiMcpConnectionDto {
+  startup?: 'on_start' | 'on_demand'
+  description?: string
   id: string
   name: string
   enabled: boolean
-  transport: 'stdio' | 'http'
-  auth?: 'none' | 'oauth'
+  transport: 'stdio' | 'http' | 'sse'
+  auth?: 'none' | 'bearer' | 'api_key' | 'oauth'
+  credentialRef?: string
+  apiKeyHeader?: string
+  oauthClientId?: string
+  oauthClientSecretRef?: string
+  oauthScopes?: string
+  oauthTokenAuthMethod?: 'auto' | 'none' | 'client_secret_basic' | 'client_secret_post'
   clientMetadataUrl?: string
   oauthRedirectUri?: string
   command: string
@@ -151,9 +159,11 @@ export interface PiMcpConnectionDto {
   headers: Record<string, string>
 }
 
+export interface BrowserExtensionStatusDto {reason?:string;connected:boolean;paused:boolean;prepared:boolean;extensionDirectory:string;extensionId:string;extensionsPage:string;browser:'chrome'|'msedge';}
 export type ComputerUseBrowserConfigurationDto =
-  | { mode?: 'attach'; endpoint: string; allowedOrigins: string[] }
-  | { mode: 'managed'; channel: 'chromium' | 'chrome' | 'msedge'; profile: string; allowedOrigins: string[]; startUrl?: string };
+  | {mode:'extension';channel:'chrome'|'msedge';restrictOrigins?:boolean;allowedOrigins?:string[]}
+  | { mode?: 'attach'; endpoint: string; restrictOrigins?: boolean; allowedOrigins?: string[] }
+  | { mode: 'managed'; channel: 'chromium' | 'chrome' | 'msedge'; profile: string; restrictOrigins?: boolean; allowedOrigins?: string[]; startUrl?: string };
 
 export interface ComputerUseStatusDto {
   readonly browser?: ComputerUseBrowserConfigurationDto;
@@ -183,7 +193,7 @@ export interface PiExtensionsDto {
   running: boolean
   host_active: boolean
   skill_diagnostics?: Array<{ path: string; message: string }>
-  mcp_status?: Record<string, { keys: string[]; oauth: string; status: string; message: string; discoveredAt: number }>
+  mcp_status?: Record<string, { keys: string[]; oauth: string; status: string; message: string; discoveredAt: number; toolCount?: number }>
   loaded_skills: Array<{ id: string; name: string; description: string; disableModelInvocation: boolean }>
 }
 

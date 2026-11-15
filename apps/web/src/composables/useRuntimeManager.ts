@@ -27,8 +27,6 @@ const lifecycleAction = ref<'start' | 'stop' | null>(null)
 let lifecycleSequence = 0
 let startupAbort: AbortController | null = null
 const copiedUrl = ref('')
-const tunnelTokenVisible = ref(false)
-const oauthPasswordVisible = ref(false)
 let pollTimer = 0
 let initializePromise: Promise<void> | null = null
 let initializationErrorShown = false
@@ -233,8 +231,6 @@ export function useRuntimeManager() {
     lifecycleBusy,
     lifecycleAction: computed(() => runtime.value?.stopping ? 'stop' : lifecycleAction.value),
     copiedUrl,
-    tunnelTokenVisible,
-    oauthPasswordVisible,
     running,
     locked,
     runtimeUrl: computed(() => runtime.value ? runtimeUrl(runtime.value) : ''),

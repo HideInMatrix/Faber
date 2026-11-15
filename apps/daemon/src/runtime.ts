@@ -1,4 +1,6 @@
+import {getBrowserExtensionStatus,prepareHostedBrowserExtension,extensionBrowser} from "./browser-extension.js";
 import { stat } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 
@@ -20,7 +22,7 @@ import {
   type NetworkProviderResult,
 } from "@micromatrix/network";
 import { LocalOAuthServer } from "@micromatrix/oauth";
-import { PluginRegistry, parseExtensions, type ExtensionConfiguration, type McpConnectionConfig, type PluginLogger } from "@micromatrix/plugin-kit";
+import { PluginRegistry, parseExtensions, resolveMcpInvocation, type ExtensionConfiguration, type McpConnectionConfig, type PluginLogger } from "@micromatrix/plugin-kit";
 import { PiBodyHost, createPiBodyExtension } from "@micromatrix/pi-body";
 import { createMcpExtension, McpConnection, McpAuthStore, type McpExtensionController, type McpOptions } from "@micromatrix/plugin-mcp";
 import { createSkillsExtension, createSkillFile, loadedSkills, removeCreatedSkill, validateSkillSource, readSkillDocument, editSkillDocument, discoverSkillFiles, inspectSkillSources, previewSkillImport, planSkillImport } from "@micromatrix/plugin-skills";
@@ -30,6 +32,9 @@ import { createWorkspacePlugin } from "@micromatrix/plugin-workspace";
 import { saveConfig, type DaemonConfig } from "./config.js";
 import { CloudflaredUpdater } from "./cloudflared-update.js";
 import { APP_VERSION } from "./version.js";
+import { createCapabilitiesPlugin, searchCapabilities as searchCapabilityEntries, type CapabilityEntry, type CapabilityTool } from "./capabilities.js";
+import { McpCatalogStore } from "./mcp-catalog.js";
+import { createMcpManagementPlugin } from "./mcp-management.js";
 import { builtinComputerUseConfiguration, computerUseConnection } from "./builtin-computer-use.js";
 
 export class RuntimeSupervisor implements RuntimeControl {
@@ -57,6 +62,10 @@ export class RuntimeSupervisor implements RuntimeControl {
   }
   #cloudflaredCustomExecutable(): string {
     return this.#config.network.provider === "cloudflare" ? this.#config.network.options.executable ?? "" : "";
+  }
+  async computerUseBrowserExtensionStatus(browser: unknown) { return getBrowserExtensionStatus(this.#config.workspace, extensionBrowser(browser)); }
+  async prepareComputerUseBrowserExtension(browser: unknown) {
+    return this.#exclusive(async()=>{this.#assertExtensionsEditable();if(this.#failureCleanup)await this.#failureCleanup;return prepareHostedBrowserExtension(this.#config.workspace,extensionBrowser(browser));});
   }
   computerUseConnection(): McpConnectionConfig {
     return computerUseConnection(this.#config.workspace, true, false, this.#config.computerUse);
@@ -94,7 +103,7 @@ export class RuntimeSupervisor implements RuntimeControl {
       this.#assertExtensionsEditable();
       if (this.#failureCleanup) await this.#failureCleanup;
       const browser = value === null ? undefined : parseComputerUseBrowser(value);
-      if (browser?.mode === "managed") computerUseBrowserDataDirectory(this.#config.workspace);
+      if (browser?.mode === "managed" || browser?.mode === "extension") computerUseBrowserDataDirectory(this.#config.workspace);
       const { browser: _previous, ...configuration } = this.#config.computerUse ?? {enabled: false, allowActions: true};
       // Parse and persist only: no browser connection, profile discovery,
       // download, permission prompt or Runtime/Tunnel startup on Save.
@@ -141,15 +150,20 @@ export class RuntimeSupervisor implements RuntimeControl {
   #exitReason = "";
   #networkWarning = "";
   readonly #mcpAuth: McpAuthStore;
+  readonly #mcpDraftAuth = new Map<string,McpAuthStore>();
   readonly #mcpControllers = new Map<string, McpExtensionController>();
   readonly #mcpCatalogs = new Map<string, readonly string[]>();
-  readonly #mcpHealth = new Map<string, { status: string; message: string; discoveredAt: number }>();
+  readonly #capabilityTools: McpCatalogStore;
+  readonly #pausedMcp = new Set<string>();
+  readonly #mcpHealth = new Map<string, { status: string; message: string; discoveredAt: number; toolCount?: number }>();
 
   constructor(config: DaemonConfig, logger: PluginLogger) {
     this.#cloudflared = new CloudflaredUpdater(config.configFile);
     const builtin = builtinComputerUseConfiguration(config.computerUse, parseExtensions(config.extensions));
     this.#config = { ...config, computerUse: builtin.configuration, extensions: builtin.extensions };
     this.#logger = logger;
+    this.#capabilityTools = new McpCatalogStore(`${config.configFile}.mcp-catalog.json`,message=>logger.log("warn",message));
+    this.#pruneMcpCatalog();
     this.#mcpAuth = new McpAuthStore(`${config.configFile}.mcp-credentials.json`, config.rememberSecrets);
     this.approval = new ApprovalPolicy(config.permissionMode, 120_000, (event) => {
       const level = event.outcome === "queued" || event.outcome === "allowed" ? "info" : "warn";
@@ -184,9 +198,9 @@ export class RuntimeSupervisor implements RuntimeControl {
       skills: this.#host ? loadedSkills(this.#host.loader).map(({ filePath: _path, ...skill }) => skill) : [],
       extensionHostActive: Boolean(this.#host),
       mcpStatus: Object.fromEntries(parseExtensions(this.#config.extensions).mcp.map(connection => {
-        const authentication = this.#mcpAuth.summary(connection);
+        const authentication = (this.#mcpDraftAuth.get(connection.id) ?? this.#mcpAuth).summary(connection);
         const health = this.#mcpHealth.get(connection.id) ?? { status: "stopped", message: "", discoveredAt: 0 };
-        return [connection.id, { ...authentication, ...health, message: health.message || authentication.message }];
+        return [connection.id, { ...authentication, ...health, toolCount: this.#mcpCatalogs.get(connection.id)?.length ?? health.toolCount ?? 0, message: authentication.message || health.message }];
       })),
       tools: this.#registry.listTools().map((tool) => ({
         name: tool.name,
@@ -196,6 +210,46 @@ export class RuntimeSupervisor implements RuntimeControl {
       })),
     };
   }
+
+  #capabilityIdentity(config: McpConnectionConfig): string {
+    return createHash("sha256").update(JSON.stringify([config.transport,config.url,config.command,config.args,config.envRefs,config.headers,config.auth,config.credentialRef,config.apiKeyHeader,config.oauthClientId])).digest("hex");
+  }
+  #pruneMcpCatalog(): void {
+    this.#capabilityTools.prune(new Map(parseExtensions(this.#config.extensions).mcp.map(config=>[config.id,this.#capabilityIdentity(config)])));
+  }
+  #capabilityCatalog(): readonly CapabilityEntry[] {
+    const liveTools=this.#registry.listTools();
+    const entries: CapabilityEntry[]=[];
+    const addMcp=(id: string,name: string,enabled: boolean,cached: {tools:readonly CapabilityTool[];discoveredAt:number}|undefined,identity: string,oauth = "not_required",fallback = "",startup: "on_start"|"on_demand" = "on_start") => {
+      const health=this.#mcpHealth.get(id);
+      const status=!enabled ? "disabled" : oauth === "pending" ? "authorizing" : !["not_required","authorized"].includes(oauth) ? "requires_auth"
+        : !this.#running || this.#stopping ? "stopped" : this.#pausedMcp.has(id) ? "paused" : health?.status ?? (startup === "on_demand" ? "idle" : "stopped");
+      const available=enabled && this.#running && !this.#stopping && status === "connected";
+      const current=liveTools.filter(tool=>this.#registry.ownerOf(tool.name)===`mcp:${id}`).map(tool=>({name:tool.name,description:tool.description.slice(0,1024),
+        schema_revision:createHash("sha256").update(JSON.stringify(tool.parameters)).digest("hex")}));
+      const tools=available ? current : cached?.tools ?? [];
+      entries.push({id:`mcp:${id}`,kind:"mcp",name,source_id:id,status,available,identity_revision:identity,startup,can_connect:enabled && this.#running && !this.#stopping && !this.#pausedMcp.has(id) && id!=="computer_use" && ["not_required","authorized"].includes(oauth),
+        description:fallback || tools.map(tool=>tool.description).filter(Boolean).slice(0,2).join("; ").slice(0,1024) || "Configured MCP service; no tool descriptions discovered yet.",
+        metadata_source:available ? "live" : cached ? "cached" : "configuration",tools,discovered_at:health?.discoveredAt || cached?.discoveredAt || 0});
+    };
+    for (const config of parseExtensions(this.#config.extensions).mcp) {
+      const cached=this.#capabilityTools.get(config.id);
+      addMcp(config.id,config.name,config.enabled,cached?.identity===this.#capabilityIdentity(config) ? cached : undefined,
+        this.#capabilityIdentity(config),config.auth === "oauth" ? this.#mcpAuth.summary(config).oauth : "not_required",config.description ?? "",config.startup);
+    }
+    if (!parseExtensions(this.#config.extensions).mcp.some(config=>config.id === "computer_use")) {
+      addMcp("computer_use","Computer Use",this.#config.computerUse?.enabled ?? false,this.#capabilityTools.get("computer_use"),createHash("sha256").update(JSON.stringify(this.#config.computerUse ?? {})).digest("hex"),"not_required",
+        "电脑交互、窗口、截图和浏览器操作工具。Desktop, window, screenshot and browser automation.");
+    }
+    if (this.#host) for (const skill of loadedSkills(this.#host.loader)) {
+      if (skill.disableModelInvocation) continue;
+      const available=this.#running && !this.#stopping && Boolean(this.#registry.getTool("skills_read"));
+      entries.push({id:`skill:${encodeURIComponent(skill.id)}`,kind:"skill",name:skill.name,description:skill.description.slice(0,1024),
+        source_id:skill.id,identity_revision:createHash("sha256").update(skill.filePath).digest("hex"),status:available ? "available" : "stopped",available,metadata_source:"loaded",tools:[],discovered_at:0});
+    }
+    return entries;
+  }
+  searchCapabilities(value: unknown = {}) { return searchCapabilityEntries(this.#capabilityCatalog(),value); }
 
   async start(): Promise<void> {
     const generation = this.#stopGeneration;
@@ -230,7 +284,7 @@ export class RuntimeSupervisor implements RuntimeControl {
         if (builtin.enabled) await this.#checkComputerUsePermissions(false); // Never prompt on Start.
         startup.signal.throwIfAborted();
         const connections = [...extensions.mcp, ...(builtin.enabled ? [computerUseConnection(this.#config.workspace, true, builtin.allowActions, this.#config.computerUse)] : [])];
-        const plugins = [createWorkspacePlugin(), ...(this.#config.plugins.shell ? [createShellPlugin()] : [])];
+        const plugins = [createWorkspacePlugin(), createCapabilitiesPlugin(()=>this.#capabilityCatalog()), this.#managementPlugin(), ...(this.#config.plugins.shell ? [createShellPlugin()] : [])];
         this.#host = await PiBodyHost.create(context, join(dirname(this.#config.configFile), "pi"), [
           ...plugins.map((plugin) => ({ name: plugin.id, factory: createPiBodyExtension([plugin], context) })),
           ...connections.filter((connection) => connection.enabled).map((connection) => ({
@@ -349,6 +403,7 @@ export class RuntimeSupervisor implements RuntimeControl {
     // lifecycle queue; desktop exit cannot leave an initializing npx tree alive.
     this.#stopGeneration++;
     this.#mcpAuth.cancelPending();
+    for (const store of this.#mcpDraftAuth.values()) store.cancelPending();
     this.#startingAbort?.abort();
     this.#host?.cancel();
     this.approval.resetSession();
@@ -371,6 +426,7 @@ export class RuntimeSupervisor implements RuntimeControl {
       for (const result of results) if (result.status === "rejected") throw result.reason;
       if (this.#failureCleanup) await this.#traceStop("failure_cleanup", this.#failureCleanup);
       this.#mcpAuth.cancelPending();
+      for (const store of this.#mcpDraftAuth.values()) store.cancelPending();
       this.#exitReason = "";
       if (!this.#running) {
         this.approval.resetSession();
@@ -452,6 +508,8 @@ export class RuntimeSupervisor implements RuntimeControl {
   async dispose(): Promise<void> {
     await this.stop();
     this.#mcpAuth.close();
+    for (const store of this.#mcpDraftAuth.values()) store.close();
+    this.#mcpDraftAuth.clear();
     this.approval.dispose();
     await this.#registry.dispose();
   }
@@ -501,26 +559,28 @@ export class RuntimeSupervisor implements RuntimeControl {
     });
   }
 
-  async testMcpConnection(value: McpConnectionConfig): Promise<{ tools: readonly string[] }> {
+  async testMcpConnection(value: McpConnectionConfig, updates: unknown = {}): Promise<{ tools: readonly string[] }> {
     return this.#exclusive(async () => {
       this.#assertExtensionsEditable();
       const config = parseExtensions({ mcp: [value] }).mcp[0]!;
-      if (config.auth === "oauth" && this.#mcpAuth.summary(config).oauth === "pending") throw new Error("Complete or cancel OAuth login before testing");
-      const connection = new McpConnection(config, this.#mcpOptions(config));
+      const store=this.#mcpDraftAuth.get(config.id) ?? this.#mcpAuth;
+      if (config.auth === "oauth" && store.summary(config).oauth === "pending") throw new Error("Complete or cancel OAuth login before testing");
+      const connection = new McpConnection(config, { ...this.#mcpOptions(config), values: store.temporaryValues(config, updates),
+        ...(config.auth === "oauth" ? {authProvider:store.provider(config,undefined,store.temporaryValues(config,updates))} : {}) });
       this.#testingMcp = connection;
       try {
         const tools = (await connection.connect(this.#config.workspace)).map(tool => tool.name);
-        this.#mcpHealth.set(config.id, { status: "tested", message: "Test passed; temporary connection closed", discoveredAt: Date.now() });
+        this.#mcpHealth.set(config.id, { status: "tested", message: `连接成功，发现 ${tools.length} 个工具；测试连接已关闭。`, discoveredAt: Date.now(), toolCount: tools.length });
         return { tools };
       } catch (error) {
-        this.#mcpHealth.set(config.id, { status: "test_failed", message: "Connection test failed; check credentials, login and executable path", discoveredAt: 0 });
+        this.#mcpHealth.set(config.id, { status: "test_failed", message: error instanceof Error ? error.message : "Connection test failed", discoveredAt: 0 });
         throw error;
       } finally { await connection.close(); if (this.#testingMcp === connection) this.#testingMcp = undefined; }
     });
   }
 
   #mcpOptions(config: McpConnectionConfig): McpOptions {
-    return { values: this.#mcpAuth.values(config), ...(this.#startingAbort ? { signal: this.#startingAbort.signal } : {}), ...(config.transport === "http" ? { fetch: this.#mcpAuth.fetchMcp } : {}),
+    return { values: this.#mcpAuth.values(config), ...(this.#startingAbort ? { signal: this.#startingAbort.signal } : {}), ...(config.transport !== "stdio" ? { fetch: this.#mcpAuth.fetchMcp } : {}),
       ...(config.auth === "oauth" ? { authProvider: this.#mcpAuth.provider(config) } : {}),
       ...(config.id === "computer_use" ? { onResult: (name, result) => {
         try {
@@ -536,7 +596,15 @@ export class RuntimeSupervisor implements RuntimeControl {
           }
         } catch { /* untrusted/malformed tool content is not a permission proof */ }
       } } satisfies Pick<McpOptions,"onResult"> : {}),
-      onStatus: (status, message) => this.#mcpHealth.set(config.id, { status, message, discoveredAt: status === "connected" ? Date.now() : this.#mcpHealth.get(config.id)?.discoveredAt ?? 0 }) };
+      onTools: tools => {
+        if (tools.length || this.#mcpHealth.get(config.id)?.status === "connected") this.#capabilityTools.set(config.id,{identity:this.#capabilityIdentity(config),discoveredAt:Date.now(),
+          tools:tools.map(tool=>({name:tool.name,description:(tool.description ?? "").slice(0,1024),
+            schema_revision:createHash("sha256").update(JSON.stringify(tool.inputSchema)).digest("hex")}))});
+      },
+      onStatus: (status, message) => {
+        this.#mcpHealth.set(config.id, { status, message, discoveredAt: status === "connected" ? Date.now() : this.#mcpHealth.get(config.id)?.discoveredAt ?? 0 });
+        if (status === "disconnected" || status === "reconnecting") this.#logger.log("warn", "MCP connection interrupted", {id:config.id,transport:config.transport,status,reason:message});
+      } };
   }
   #connection(id: string): McpConnectionConfig {
     const config = parseExtensions(this.#config.extensions).mcp.find(connection => connection.id === id);
@@ -545,16 +613,90 @@ export class RuntimeSupervisor implements RuntimeControl {
   async setMcpCredentials(id: string, updates: unknown): Promise<void> {
     return this.#exclusive(async () => { this.#assertExtensionsEditable(); this.#mcpAuth.update(this.#connection(id), updates); });
   }
+  readMcpCredentials(id: string): Readonly<Record<string,string>> { return this.#mcpAuth.readValues(this.#connection(id)); }
+  runtimeSecrets() {
+    return { oauth_password: this.#config.oauthPassword ?? "", provider: this.#config.network.provider,
+      options: Object.fromEntries(Object.entries(this.#config.network.options).filter(([name]) => /token|secret|password|key/i.test(name))) };
+  }
+  async saveMcpConnection(value: McpConnectionConfig, updates: unknown): Promise<void> {
+    return this.#exclusive(async () => {
+      this.#assertExtensionsEditable();
+      if (this.#failureCleanup) await this.#failureCleanup;
+      const connection = parseExtensions({mcp:[value]}).mcp[0]!;
+      if (connection.id === "computer_use") throw new Error("computer_use is reserved for the built-in plugin");
+      const pending=this.#mcpDraftAuth.get(connection.id);
+      if (pending?.summary(connection).oauth === "pending") throw new Error("请先完成或取消 OAuth 授权，再保存配置。");
+      const previous = parseExtensions(this.#config.extensions);
+      const extensions = parseExtensions({...previous,mcp:[...previous.mcp.filter(item => item.id !== connection.id),connection]});
+      await this.#mcpAuth.withUpdates(connection,updates,async () => {
+        try {
+          await this.#saveExtensions(extensions);
+          const draft=this.#mcpDraftAuth.get(connection.id);
+          if (draft) this.#mcpAuth.adoptSession(connection,draft);
+        } catch (error) {
+          await this.#saveExtensions(previous); throw error;
+        }
+      });
+      this.#mcpDraftAuth.get(connection.id)?.close(); this.#mcpDraftAuth.delete(connection.id);
+    });
+  }
+  async beginMcpDraftLogin(value: McpConnectionConfig, updates: unknown): Promise<{url:string}> {
+    return this.#exclusive(async () => {
+      this.#assertExtensionsEditable();
+      const config=parseExtensions({mcp:[value]}).mcp[0]!;
+      this.#mcpDraftAuth.get(config.id)?.close();
+      const store=new McpAuthStore(`${this.#config.configFile}.oauth-draft-${crypto.randomUUID()}`,false);
+      store.update(config,this.#mcpAuth.temporaryValues(config,updates));
+      store.adoptSession(config,this.#mcpAuth);
+      this.#mcpDraftAuth.set(config.id,store);
+      return store.begin(config);
+    });
+  }
   async beginMcpLogin(id: string): Promise<{ url: string }> {
     return this.#exclusive(async () => { this.#assertExtensionsEditable(); return this.#mcpAuth.begin(this.#connection(id)); });
   }
-  async cancelMcpLogin(id: string): Promise<void> { this.#mcpAuth.cancel(id); }
+  async cancelMcpLogin(id: string): Promise<void> { this.#mcpAuth.cancel(id); this.#mcpDraftAuth.get(id)?.close(); this.#mcpDraftAuth.delete(id); }
   async logoutMcp(id: string): Promise<void> {
-    return this.#exclusive(async () => { this.#assertExtensionsEditable(); this.#mcpAuth.logout(this.#connection(id)); });
+    return this.#exclusive(async () => { this.#assertExtensionsEditable(); this.#mcpDraftAuth.get(id)?.close(); this.#mcpDraftAuth.delete(id); this.#mcpAuth.logout(this.#connection(id)); });
+  }
+  #managementPlugin() {
+    return createMcpManagementPlugin({connect:id=>this.#connectMcp(id,false),disconnect:id=>this.pauseMcp(id),call:async(value,signal)=>{
+      const target=resolveMcpInvocation(this.#registry,value);
+      await this.approval.authorize(target.name,target.arguments,undefined,signal);
+      target.assertCurrent();
+      return target.tool.execute(randomUUID(),target.arguments,signal);
+    }});
+  }
+  /** Local UI may resume a pause; AI connection requests may not. */
+  async connectMcp(id:string):Promise<unknown> {return this.#connectMcp(id,true);}
+  async #connectMcp(id:string,resume:boolean):Promise<unknown> {
+    if(!this.#running || this.#stopping)throw new Error("Start Runtime before connecting MCP services");
+    const config=this.#connection(id);
+    if(!config.enabled)throw new Error("MCP service is disabled; enable it in Faber first");
+    if(this.#pausedMcp.has(id) && !resume)throw new Error("MCP service is paused by the user; resume it in Faber before connecting");
+    if(config.auth === "oauth" && this.#mcpAuth.summary(config).oauth !== "authorized")throw new Error("Authorize this MCP service in Faber first");
+    const controller=this.#mcpControllers.get(id);
+    if(!controller)throw new Error("MCP controller is not available");
+    if(resume)this.#pausedMcp.delete(id);
+    const generation=this.#stopGeneration;
+    await controller.start();
+    if(!this.#running || this.#stopping || generation!==this.#stopGeneration || this.#pausedMcp.has(id))throw new Error("MCP connection cancelled by pause or Runtime stop");
+    const tools=this.#registry.listTools().filter(tool=>this.#registry.ownerOf(tool.name)===`mcp:${id}`).map(tool=>({name:tool.name,description:tool.description,inputSchema:tool.parameters,
+      schema_revision:createHash("sha256").update(JSON.stringify(tool.parameters)).digest("hex")}));
+    return {id:`mcp:${id}`,status:"connected",available:true,revision:this.searchCapabilities({}).revision,tools};
+  }
+  async pauseMcp(id:string):Promise<unknown> {
+    if(!this.#running || this.#stopping)throw new Error("Start Runtime before pausing MCP services");
+    this.#connection(id);
+    const controller=this.#mcpControllers.get(id);if(!controller)throw new Error("MCP is not enabled");
+    this.#pausedMcp.add(id);
+    await controller.pause();
+    return {id:`mcp:${id}`,status:"paused",available:false};
   }
   async refreshMcpTools(id: string): Promise<void> {
     return this.#exclusive(async () => {
-      if (!this.#running) throw new Error("Start Runtime before refreshing MCP tools");
+      if (!this.#running || this.#stopping) throw new Error("Start Runtime before refreshing MCP tools");
+      if(this.#pausedMcp.has(id))throw new Error("Resume this MCP service in Faber before refreshing tools");
       const controller = this.#mcpControllers.get(id); if (!controller) throw new Error("MCP is not enabled");
       await controller.refresh();
     });
@@ -586,6 +728,7 @@ export class RuntimeSupervisor implements RuntimeControl {
     try { this.#mcpAuth.prune(extensions.mcp); }
     catch (error) { saveConfig(this.#config, this.#config.rememberSecrets); throw error; }
     this.#config = candidate;
+    this.#pruneMcpCatalog();
   }
 
   async #unloadHost(): Promise<void> {
@@ -594,7 +737,7 @@ export class RuntimeSupervisor implements RuntimeControl {
     host?.cancel();
     // Close owned transports concurrently before Pi's sequential shutdown hooks.
     await Promise.all([...this.#mcpControllers.values()].map(controller => controller.close().catch(() => {})));
-    this.#mcpControllers.clear(); this.#mcpCatalogs.clear(); this.#mcpHealth.clear();
+    this.#mcpControllers.clear(); this.#mcpCatalogs.clear(); this.#mcpHealth.clear(); this.#pausedMcp.clear();
     if (!host) return;
     await host.close().catch(() => this.#logger.log("warn", "Pi extension shutdown failed"));
     this.#registry = this.#createRegistry(this.#config);
@@ -661,6 +804,8 @@ export class RuntimeSupervisor implements RuntimeControl {
   #createRegistry(config: DaemonConfig): PluginRegistry {
     const registry = new PluginRegistry({ workspace: config.workspace, logger: this.#logger });
     registry.register(createWorkspacePlugin());
+    registry.register(createCapabilitiesPlugin(()=>this.#capabilityCatalog()));
+    registry.register(this.#managementPlugin());
     if (config.plugins.shell) registry.register(createShellPlugin());
     return registry;
   }

@@ -37,6 +37,10 @@ else
     --notes-file ../.github/release-notes.md
 fi
 gh release upload "$RELEASE_TAG" ./* --repo "$GITHUB_REPOSITORY" --clobber
+# Retire only the explicitly approved versions, after new assets are ready.
+if [ "$RELEASE_TAG" = v1.10.1 ]; then
+  node ../scripts/retire-approved-releases.mjs
+fi
 # Keep incomplete uploads private. Publish only after every upload
 # succeeds. No manual draft publication is required.
 gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \

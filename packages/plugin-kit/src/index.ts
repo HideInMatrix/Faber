@@ -9,3 +9,5 @@ export type {
   PluginContext,
   PluginLogger,
 } from "./types.js";
+
+export { resolveMcpInvocation } from "./mcp-invocation.js";

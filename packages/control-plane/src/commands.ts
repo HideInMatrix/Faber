@@ -125,10 +125,10 @@ function capability(tool: RuntimeTool) {
       required_capabilities: [],
       required_operation_permissions: [],
       annotations: {
-        read_only: tool.name === "read" || tool.name === "grep" || tool.name === "find" || tool.name === "ls",
+        read_only: tool.name === "read" || tool.name === "grep" || tool.name === "find" || tool.name === "ls" || tool.name === "capabilities_search",
         destructive: tool.name === "bash" || tool.name === "edit" || tool.name === "write",
         idempotent: false,
-        open_world: external || tool.name === "bash",
+        open_world: external || tool.name === "bash" || tool.pluginId === "mcp-management",
       },
       permission_boundary: "Pi tool plugin",
       approval_boundary: "MCP client and local policy",
@@ -201,6 +201,12 @@ export class DesktopCommandRouter {
         if (typeof request.args[0] !== "boolean") throw new Error("Computer Use enabled must be a boolean");
         await this.#options.runtime.setComputerUseEnabled(request.args[0]);
         return this.#options.runtime.computerUseStatus?.();
+      case "get_computer_use_browser_extension_status":
+        if(!this.#options.runtime.computerUseBrowserExtensionStatus)throw new Error("Browser extension unavailable");
+        return this.#options.runtime.computerUseBrowserExtensionStatus(request.args[0]);
+      case "prepare_computer_use_browser_extension":
+        if(!this.#options.runtime.prepareComputerUseBrowserExtension)throw new Error("Browser extension unavailable");
+        return this.#options.runtime.prepareComputerUseBrowserExtension(request.args[0]);
       case "configure_computer_use_browser":
         if (!this.#options.runtime.configureComputerUseBrowser) throw new Error("Computer Use browser configuration unavailable");
         if (request.args.length !== 1) throw new Error("One browser configuration or null is required");
@@ -235,18 +241,36 @@ export class DesktopCommandRouter {
       }
       case "test_pi_mcp":
         if (!this.#options.runtime.testMcpConnection) throw new Error("Pi MCP connection testing unavailable");
-        return this.#options.runtime.testMcpConnection(parseMcpConnection(request.args[0]));
+        return this.#options.runtime.testMcpConnection(parseMcpConnection(request.args[0]), request.args[1] ?? {});
+      case "get_pi_mcp_credentials":
+        if (!this.#options.runtime.readMcpCredentials) throw new Error("MCP credential management unavailable");
+        return this.#options.runtime.readMcpCredentials(String(request.args[0] ?? ""));
+      case "save_pi_mcp_connection":
+        if (!this.#options.runtime.saveMcpConnection) throw new Error("MCP connection management unavailable");
+        await this.#options.runtime.saveMcpConnection(parseMcpConnection(request.args[0]), request.args[1] ?? {}); return true;
+      case "get_runtime_secrets":
+        if (!this.#options.runtime.runtimeSecrets) throw new Error("Runtime configuration unavailable");
+        return this.#options.runtime.runtimeSecrets();
       case "set_pi_mcp_credentials":
         if (!this.#options.runtime.setMcpCredentials) throw new Error("MCP credential management unavailable");
         await this.#options.runtime.setMcpCredentials(String(request.args[0] ?? ""), request.args[1]); return true;
       case "login_pi_mcp":
         if (!this.#options.runtime.beginMcpLogin) throw new Error("MCP OAuth unavailable");
         return this.#options.runtime.beginMcpLogin(String(request.args[0] ?? ""));
+      case "login_pi_mcp_draft":
+        if (!this.#options.runtime.beginMcpDraftLogin) throw new Error("MCP OAuth unavailable");
+        return this.#options.runtime.beginMcpDraftLogin(parseMcpConnection(request.args[0]),request.args[1] ?? {});
       case "cancel_pi_mcp_login":
         await this.#options.runtime.cancelMcpLogin?.(String(request.args[0] ?? "")); return true;
       case "logout_pi_mcp":
         if (!this.#options.runtime.logoutMcp) throw new Error("MCP OAuth unavailable");
         await this.#options.runtime.logoutMcp(String(request.args[0] ?? "")); return true;
+      case "connect_pi_mcp":
+        if (!this.#options.runtime.connectMcp) throw new Error("MCP connection unavailable");
+        return this.#options.runtime.connectMcp(String(request.args[0] ?? ""));
+      case "pause_pi_mcp":
+        if (!this.#options.runtime.pauseMcp) throw new Error("MCP pause unavailable");
+        return this.#options.runtime.pauseMcp(String(request.args[0] ?? ""));
       case "refresh_pi_mcp":
         if (!this.#options.runtime.refreshMcpTools) throw new Error("MCP refresh unavailable");
         await this.#options.runtime.refreshMcpTools(String(request.args[0] ?? "")); return true;

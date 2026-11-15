@@ -5,7 +5,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { nativeBuildTarget } from './build-platform.mjs'
 import { releaseVersion } from './release-version.mjs'
-import { computerUseNoticeSources } from './computer-use-package.mjs'
+import { computerUseNoticeSources, computerUseNativeResource } from './computer-use-package.mjs'
 import { assertDistributionTree } from './distribution-privacy.mjs'
 
 const installerFormats = {
@@ -66,6 +66,9 @@ export function packageArtifacts(root = process.cwd(), env = process.env) {
   if (process.platform === 'darwin' && !existsSync(path.join(application, 'Contents/MacOS/micromatrix-computer'))) throw new Error('Missing bundled Computer Use application')
   if (process.platform === 'win32' && !existsSync(computer)) throw new Error('Missing bundled Computer Use native helper')
 
+  const runtimeDependencies=process.platform==='win32'?computerUseNativeResource(target).dependencies.map(source=>path.join(root,'apps/desktop/resources/computer-use',path.basename(source))):[]
+  for(const dependency of runtimeDependencies)if(!existsSync(dependency))throw new Error('Missing bundled Computer Use runtime: '+path.basename(dependency))
+
   const nodeDirectory = path.dirname(process.execPath)
   const nodeLicense = [path.join(nodeDirectory, 'LICENSE'), path.join(nodeDirectory, '../LICENSE')].find(file => existsSync(file))
   if (!nodeLicense) throw new Error('Node distribution LICENSE is required beside the Node executable or its parent directory')
@@ -91,6 +94,7 @@ export function packageArtifacts(root = process.cwd(), env = process.env) {
       execFileSync('/usr/bin/ditto', [application, path.join(serviceDirectory, 'Faber Computer Use.app')], { stdio: 'inherit' })
     } else if (process.platform === 'win32') {
       copyFileSync(computer, path.join(serviceDirectory, `micromatrix-computer${extension}`))
+      for(const dependency of runtimeDependencies)copyFileSync(dependency,path.join(serviceDirectory,path.basename(dependency)))
     }
     cpSync(dependencyNotices, path.join(serviceDirectory, 'notices/dependencies'), { recursive: true })
     copyFileSync(nodeLicense, path.join(serviceDirectory, 'NODE_LICENSE'))

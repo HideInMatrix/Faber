@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module'
-import { readFileSync, realpathSync } from 'node:fs'
+import { readFileSync, realpathSync, existsSync } from 'node:fs'
 import path from 'node:path'
-import { assertComputerUsePackage } from './distribution-privacy.mjs'
+import { assertComputerUsePackage, computerUseRdpFile, computerUseRdpNotices } from './distribution-privacy.mjs'
 
 // Resolve from the workspace declaring the dependency, even if npm nests it.
 const daemonRequire = createRequire(new URL('../apps/daemon/package.json', import.meta.url))
@@ -12,7 +12,7 @@ if (realpathSync(computerUsePackageRoot) !== path.resolve(computerUsePackageRoot
 }
 export const computerUseRequire = createRequire(path.join(computerUsePackageRoot, 'package.json'))
 const computerUsePackage = JSON.parse(readFileSync(path.join(computerUsePackageRoot, 'package.json'), 'utf8'))
-if (computerUsePackage.name !== '@hideinmatrix/computer-use' || computerUsePackage.version !== '0.5.2'
+if (computerUsePackage.name !== '@hideinmatrix/computer-use' || computerUsePackage.version !== '0.9.3'
   || computerUsePackage.repository?.url !== 'git+https://github.com/HideInMatrix/computer-use.git') {
   throw new Error('Unexpected Computer Use package; review native/API/resource contracts before upgrading')
 }
@@ -37,7 +37,7 @@ export function computerUseNativeResource(target) {
     || data.readUInt32LE(4) !== (target.startsWith('aarch64') ? 0x100000c : 0x1000007)) {
     throw new Error(`Computer Use package helper has incorrect Mach-O architecture: ${target}`)
   }
-  return { binary, application }
+  return { binary, application, dependencies: windows && existsSync(path.join(computerUsePackageRoot,computerUseRdpFile)) ? [path.join(computerUsePackageRoot,computerUseRdpFile)] : [] }
 }
 
 // Carry the actual dependency's attribution, not stale copies of its port.
@@ -49,4 +49,9 @@ export const computerUseNoticeSources = [
   ['third_party/asil/NOTICE', 'ASIL_NOTICE.txt'],
   ['third_party/automation/QUICKJS_LICENSE', 'QUICKJS_LICENSE.txt'],
   ['third_party/automation/PLAYWRIGHT_LICENSE', 'PLAYWRIGHT_LICENSE.txt'],
+  ['third_party/capitaine/COPYING', 'CAPITAINE_COPYING.txt'],
+  ['third_party/capitaine/GPL-3.0', 'CAPITAINE_GPL_3_0.txt'],
+  ['third_party/capitaine/NOTICE', 'CAPITAINE_NOTICE.txt'],
+  ['third_party/capitaine/default.svg', 'CAPITAINE_DEFAULT.svg'],
+  ...(existsSync(path.join(computerUsePackageRoot,computerUseRdpFile)) ? computerUseRdpNotices.map((source,index)=>[source,['FREERDP_LICENSE.txt','OPENSSL_LICENSE.txt','ZLIB_LICENSE.txt'][index]]) : []),
 ].map(([source, name]) => [path.join(computerUsePackageRoot, source), name])

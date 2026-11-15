@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch'
 import { computerPermissionLabel } from '../../lib/computer-use-permissions'
 import { desktopApi } from '../../api/desktop'
 import { updateInstallationLocked } from '../../composables/useAppUpdater'
-import type { ComputerUseStatusDto } from '../../types'
+import type { ComputerUseStatusDto, BrowserExtensionStatusDto } from '../../types'
 
 const props = defineProps<{ locked?: boolean }>()
 const emit = defineEmits<{ changed: [] }>()
@@ -17,20 +17,23 @@ const status = ref<ComputerUseStatusDto | null>(null)
 const busy = ref(false)
 const loadingError = ref('')
 const browserEndpoint = ref('')
-const browserMode = ref<'attach' | 'managed'>('managed')
+const browserMode = ref<'extension' | 'attach' | 'managed'>('extension')
+const extensionStatus = ref<BrowserExtensionStatusDto | null>(null)
 const browserChannel = ref<'chrome' | 'msedge' | 'chromium'>('chrome')
 const browserProfile = ref('default')
 const browserStartUrl = ref('')
 const browserOrigins = ref('')
+const browserRestrictOrigins = ref(false)
 const browserDirty = ref(false)
 const browserError = ref('')
 function loadBrowser() {
   if (browserDirty.value) return
   const browser = status.value?.browser
-  browserMode.value = browser?.mode === 'managed' || !browser ? 'managed' : 'attach'
-  browserEndpoint.value = browser && browser.mode !== 'managed' ? browser.endpoint : ''
-  browserOrigins.value = browser?.allowedOrigins.join('\n') ?? ''
-  browserChannel.value = browser?.mode === 'managed' ? browser.channel ?? 'chrome' : 'chrome'
+  browserMode.value = !browser || browser.mode === 'extension' ? 'extension' : browser.mode === 'managed' ? 'managed' : 'attach'
+  browserEndpoint.value = browser && (browser.mode === 'attach' || browser.mode === undefined) ? browser.endpoint : ''
+  browserOrigins.value = browser?.allowedOrigins?.join('\n') ?? ''
+  browserRestrictOrigins.value = browser?.restrictOrigins ?? false
+  browserChannel.value = browser?.mode === 'managed' || browser?.mode === 'extension' ? browser.channel ?? 'chrome' : 'chrome'
   browserProfile.value = browser?.mode === 'managed' ? browser.profile ?? 'default' : 'default'
   browserStartUrl.value = browser?.mode === 'managed' ? browser.startUrl ?? '' : ''
 }
@@ -43,6 +46,7 @@ async function refresh() {
   status.value = await desktopApi.computerUseStatus()
   loadingError.value = ''
   loadBrowser()
+  if (browserMode.value === 'extension') await readExtensionStatus()
 }
 async function check(request = false) {
   status.value = await desktopApi.checkComputerUsePermissions(request)
@@ -77,18 +81,42 @@ async function requestPermission() {
     await desktopApi.openComputerUseSettings()
   })
 }
+const extensionBrowser = () => browserChannel.value === 'msedge' ? 'msedge' as const : 'chrome' as const
+async function readExtensionStatus() {
+  extensionStatus.value = await desktopApi.computerUseBrowserExtensionStatus(extensionBrowser())
+}
+function changeBrowserMode() {
+  browserDirty.value = true
+  if (browserMode.value === 'extension') {
+    browserChannel.value = extensionBrowser()
+    void action(readExtensionStatus, true)
+  }
+}
+async function prepareExtension() {
+  await action(async () => {
+    browserError.value = ''
+    extensionStatus.value = await desktopApi.prepareComputerUseBrowserExtension(extensionBrowser())
+    browserDirty.value = true
+  }, true)
+}
+async function copyExtensionPath() {
+  await action(async () => { if (extensionStatus.value) await navigator.clipboard.writeText(extensionStatus.value.extensionDirectory) }, true)
+}
 async function saveBrowser(clear = false) {
   if (locked.value) return
   await action(async () => {
     browserError.value = ''
     const endpoint = browserEndpoint.value.trim()
-    const allowedOrigins = [...new Set(browserOrigins.value.split(/\r?\n/).map(value => value.trim()).filter(Boolean))]
-    if (!clear && !allowedOrigins.length) throw new Error(t("至少填写一个允许的网站"))
-    if (!clear && browserMode.value === 'attach' && !endpoint) throw new Error(t("填写本地连接地址和至少一个允许的网站"))
+    const restrictOrigins = browserRestrictOrigins.value
+    const allowedOrigins = restrictOrigins ? [...new Set(browserOrigins.value.split(/\r?\n/).map(value => value.trim()).filter(Boolean))] : []
+    if (!clear && restrictOrigins && !allowedOrigins.length) throw new Error(t("至少填写一个允许的网站"))
+    if (!clear && browserMode.value === 'attach' && !endpoint) throw new Error(t("填写本地浏览器连接地址"))
     const startUrl = browserStartUrl.value.trim()
-    status.value = await desktopApi.configureComputerUseBrowser(clear ? null : browserMode.value === 'managed'
-      ? { mode: 'managed', channel: browserChannel.value, profile: browserProfile.value.trim(), allowedOrigins, ...(startUrl ? { startUrl } : {}) }
-      : { mode: 'attach', endpoint, allowedOrigins })
+    status.value = await desktopApi.configureComputerUseBrowser(clear ? null : browserMode.value === 'extension'
+      ? { mode: 'extension', channel: extensionBrowser(), restrictOrigins, allowedOrigins }
+      : browserMode.value === 'managed'
+      ? { mode: 'managed', channel: browserChannel.value, profile: browserProfile.value.trim(), restrictOrigins, allowedOrigins, ...(startUrl ? { startUrl } : {}) }
+      : { mode: 'attach', endpoint, restrictOrigins, allowedOrigins })
     browserDirty.value = false
     loadBrowser()
     emit('changed')
@@ -132,9 +160,26 @@ defineExpose({ refresh: () => action(refresh) })
       <summary class="cursor-pointer text-sm">{{ t("浏览器连接") }}<span v-if="status.browser" class="ml-2 text-xs text-muted-foreground">{{ t("已配置") }}</span></summary>
       <fieldset :disabled="locked" class="mt-3 space-y-3">
         <FormField :label="t('浏览器连接方式')">
-          <select v-model="browserMode" :aria-label="t('浏览器连接方式')" @change="browserDirty = true"><option value="managed">{{ t("托管独立窗口（无需 CDP）") }}</option><option value="attach">{{ t("附加现有 CDP 浏览器") }}</option></select>
+          <select v-model="browserMode" :aria-label="t('浏览器连接方式')" @change="changeBrowserMode"><option value="extension">{{ t("使用当前浏览器（推荐）") }}</option><option value="managed">{{ t("托管独立窗口（无需 CDP）") }}</option><option value="attach">{{ t("附加现有 CDP 浏览器") }}</option></select>
         </FormField>
-        <FormField v-if="browserMode === 'attach'" :label="t('本地浏览器连接地址')">
+        <template v-if="browserMode === 'extension'">
+          <FormField :label="t('浏览器类型')"><select v-model="browserChannel" :aria-label="t('浏览器类型')" @change="browserDirty = true; action(readExtensionStatus, true)"><option value="chrome">Google Chrome</option><option value="msedge">Microsoft Edge</option></select></FormField>
+          <p class="text-xs text-muted-foreground">{{ t("复用当前浏览器和登录状态，在目标标签页内操作，不移动系统鼠标或抢占其他窗口。") }}</p>
+          <div class="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="outline" @click="prepareExtension">{{ t("准备浏览器扩展") }}</Button>
+            <Button size="sm" variant="outline" @click="action(readExtensionStatus, true)">{{ t("刷新连接状态") }}</Button>
+            <span role="status" :aria-label="t('扩展连接状态')" class="text-xs text-muted-foreground">{{ extensionStatus?.connected ? extensionStatus.paused ? t("已停止，在对话中说继续") : t("浏览器扩展已连接") : t("浏览器扩展未连接") }}</span>
+          </div>
+          <p v-if="extensionStatus?.reason" class="text-xs text-muted-foreground" role="status">{{ extensionStatus.reason }}</p>
+          <div v-if="extensionStatus?.prepared" class="rounded-lg border border-border p-3 space-y-2 text-xs">
+            <p>{{ t("首次安装：在浏览器地址栏打开下方地址，开启开发者模式，加载已解压的扩展并选择扩展目录。") }}</p>
+            <FormField :label="t('扩展管理地址')"><input :value="extensionStatus.extensionsPage" readonly :aria-label="t('扩展管理地址')" /></FormField>
+            <FormField :label="t('扩展目录')"><input :value="extensionStatus.extensionDirectory" readonly :aria-label="t('扩展目录')" /></FormField>
+            <Button size="sm" variant="outline" @click="copyExtensionPath">{{ t("复制扩展目录") }}</Button>
+            <p>{{ t("扩展安装后自动连接，意外断线自动重连；工具栏可查看状态和失败原因。主动停止后，在对话中告诉 AI“继续”即可恢复，无需点击浏览器按钮。") }}</p>
+          </div>
+        </template>
+        <FormField v-else-if="browserMode === 'attach'" :label="t('本地浏览器连接地址')">
           <input id="computer-browser-endpoint" :aria-label="t('本地浏览器连接地址')" v-model="browserEndpoint" placeholder="ws://127.0.0.1:9222/devtools/browser/…" @input="browserDirty = true" />
         </FormField>
         <template v-else>
@@ -144,7 +189,12 @@ defineExpose({ refresh: () => action(refresh) })
           <p class="text-xs text-muted-foreground">{{ t("使用专用登录态，不读取日常浏览器资料。首次明确选择浏览器通道并经审批后启动独立窗口；保存和启动 Runtime 均不会打开浏览器。") }}</p>
           <p class="text-xs text-muted-foreground">{{ t("Chrome / Edge 必须已安装；Chromium 需要另行准备匹配版本，不会自动下载。停止 Runtime 会关闭托管窗口，保留独立会话。") }}</p>
         </template>
-        <FormField :label="t('允许的网站（每行一个）')">
+        <div class="flex items-center justify-between gap-4">
+          <label for="computer-browser-site-restriction" class="text-sm">{{ t("限制可访问的网站") }}</label>
+          <Switch id="computer-browser-site-restriction" v-model="browserRestrictOrigins" :aria-label="t('限制可访问的网站')" @update:model-value="browserDirty = true" />
+        </div>
+        <p class="text-xs text-muted-foreground">{{ t("默认可访问任意 HTTP/HTTPS 网站；开启限制后仅允许访问名单中的网站。") }}</p>
+        <FormField v-if="browserRestrictOrigins" :label="t('允许的网站（每行一个）')">
           <textarea id="computer-browser-origins" :aria-label="t('允许的网站')" v-model="browserOrigins" :rows="3" placeholder="https://example.com" @input="browserDirty = true" />
         </FormField>
         <p v-if="browserMode === 'attach'" class="text-xs text-muted-foreground">{{ t("仅连接已开启调试的独立 Chromium 浏览器；保存不启动浏览器或 Runtime。") }}</p>

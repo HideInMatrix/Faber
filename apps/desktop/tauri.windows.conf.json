@@ -1,6 +1,13 @@
 {
   "$schema": "../../node_modules/@tauri-apps/cli/config.schema.json",
   "bundle": {
-    "externalBin": ["binaries/micromatrix-service", "binaries/cloudflared", "binaries/micromatrix-computer"]
+    "externalBin": [
+      "binaries/micromatrix-service",
+      "binaries/cloudflared",
+      "binaries/micromatrix-computer"
+    ],
+    "resources": {
+      "resources/computer-use/": "."
+    }
   }
 }
