@@ -1,2 +1,2 @@
 // Release builds overwrite this value from the Git tag before compiling.
-export const APP_VERSION = "1.10.2";
+export const APP_VERSION = "1.10.3";

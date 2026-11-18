@@ -1,0 +1,13 @@
+{
+  "name": "picomatch",
+  "version": "4.0.7",
+  "private": true,
+  "description": "Locally hardened copy of upstream picomatch 4.0.7",
+  "repository": "https://github.com/micromatch/picomatch",
+  "license": "MIT",
+  "main": "index.js",
+  "engines": {
+    "node": ">=12"
+  },
+  "sideEffects": false
+}
