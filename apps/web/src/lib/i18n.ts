@@ -3,6 +3,9 @@ export const LOCALE_STORAGE_KEY = 'faber-interface-language'
 
 // Default/fallback messages stay Chinese. Raw logs and user content are not translated.
 export const englishMessages: Readonly<Record<string, string>> = {
+  '自动项目记忆': 'Automatic project memory',
+  '允许 AI 主动查找并保存项目摘要。关闭后保留已有记忆。': 'Let AI find and save project summaries automatically. Turning this off keeps existing memories.',
+  '先保存工作目录，再设置该项目的记忆。': 'Save the working directory before changing its memory setting.',
   "启动方式": "Startup mode",
   "按需启动": "On demand",
   "随 Runtime 启动": "With Runtime",

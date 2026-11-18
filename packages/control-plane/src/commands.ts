@@ -78,6 +78,7 @@ function runtimeDto(runtime: RuntimeSnapshot) {
     workspace: runtime.workspace,
     has_oauth_password: runtime.oauthEnabled,
     remember_secrets: runtime.rememberSecrets,
+    project_memory_enabled: runtime.projectMemoryEnabled ?? true,
     host: runtime.host,
     port: runtime.port,
     permission_mode: runtime.permissionMode,
@@ -166,6 +167,14 @@ export class DesktopCommandRouter {
         if (!this.#options.runtime.updateCloudflared || typeof request.args[0] !== "string") throw new Error("请先检查 cloudflared 更新");
         return this.#options.runtime.updateCloudflared(request.args[0]);
       case "get_runtime": return runtimeView;
+      case "set_project_memory_enabled": {
+        const [workspace, enabled] = request.args;
+        if (!this.#options.runtime.setProjectMemoryEnabled || typeof workspace !== "string" || typeof enabled !== "boolean") {
+          throw new Error("Invalid project memory setting");
+        }
+        await this.#options.runtime.setProjectMemoryEnabled(workspace, enabled);
+        return runtimeDto(this.#options.runtime.snapshot());
+      }
       case "configure_runtime": {
         await this.#options.runtime.configure(this.#configuration(request.args[0]));
         return runtimeDto(this.#options.runtime.snapshot());

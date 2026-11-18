@@ -49,6 +49,7 @@ export interface RuntimeDto {
   workspace: string
   has_oauth_password: boolean
   remember_secrets: boolean
+  project_memory_enabled?: boolean
   host: string
   port: number
   permission_mode: 'safe' | 'trusted' | 'dangerous'

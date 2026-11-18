@@ -34,6 +34,7 @@ let initializationErrorShown = false
 export function useRuntimeManager() {
   const running = computed(() => Boolean(runtime.value?.running))
   const locked = computed(() => running.value || runtime.value?.stopping === true || lifecycleBusy.value || busy.value || updateInstallationLocked.value)
+  const projectMemoryEditable = computed(() => Boolean(runtime.value && draft.value.workspace.trim() === runtime.value.workspace))
 
   async function refreshRuntime() {
     const previous = runtime.value
@@ -80,6 +81,19 @@ export function useRuntimeManager() {
     try {
       await persistDraft()
       toast.success(t("Runtime 配置已保存。"))
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error))
+    } finally {
+      busy.value = false
+    }
+  }
+
+  async function setProjectMemory(enabled: boolean) {
+    const saved = runtime.value
+    if (locked.value || !projectMemoryEditable.value || !saved) return
+    busy.value = true
+    try {
+      runtime.value = await desktopApi.setProjectMemory(saved.workspace, enabled)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error))
     } finally {
@@ -233,10 +247,12 @@ export function useRuntimeManager() {
     copiedUrl,
     running,
     locked,
+    projectMemoryEditable,
     runtimeUrl: computed(() => runtime.value ? runtimeUrl(runtime.value) : ''),
     chooseWorkspace,
     initialize,
     saveRuntime,
+    setProjectMemory,
     toggleRunning,
     copyUrl,
   }

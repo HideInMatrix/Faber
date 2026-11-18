@@ -40,6 +40,10 @@ Getting started:
 1. Open the app, configure your working directory, OAuth password, and network provider, then save and click **Start**.
 2. Add the displayed MCP URL to a web MCP client that supports CIMD OAuth and complete authorization.
 
+When you click **Start**, Faber creates or reuses `.faber/` in the selected working directory. Pi uses `.faber/pi/` and project memories are stored in `.faber/memory.jsonl`. App settings and credentials remain in the existing local configuration.
+
+**Automatic project memory** is on by default. Faber guides the web AI to find earlier project conventions, decisions, and handoffs and to save brief summaries of confirmed details it can reuse. The tools only access the current project. Stop Runtime to change the setting. Turning it off keeps existing memory. The web client determines whether to follow the guidance or require approval for a tool call.
+
 macOS installers use a long-lived self-signed certificate and are not notarized by Apple. Windows installers are not Authenticode-signed. If your system blocks the app, verify the download source before following the system’s instructions to allow it to run.
 
 The app checks for updates automatically; confirm installation on the **About** page. `.app.tar.gz`, `latest.json`, and checksum files are for updates or verification, not first-time installation.

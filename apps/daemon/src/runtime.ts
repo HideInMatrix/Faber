@@ -1,8 +1,8 @@
 import {getBrowserExtensionStatus,prepareHostedBrowserExtension,extensionBrowser} from "./browser-extension.js";
 import { stat } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 
 import { ApprovalPolicy } from "@micromatrix/approval";
 import type { RuntimeConfigurationUpdate, RuntimeControl, RuntimeSnapshot, SecretUpdate, BuiltinComputerUseStatus, ComputerUsePermissionStatus } from "@micromatrix/control-plane";
@@ -22,7 +22,7 @@ import {
   type NetworkProviderResult,
 } from "@micromatrix/network";
 import { LocalOAuthServer } from "@micromatrix/oauth";
-import { PluginRegistry, parseExtensions, resolveMcpInvocation, type ExtensionConfiguration, type McpConnectionConfig, type PluginLogger } from "@micromatrix/plugin-kit";
+import { PluginRegistry, PROJECT_MEMORY, parseExtensions, resolveMcpInvocation, type ExtensionConfiguration, type McpConnectionConfig, type PluginLogger } from "@micromatrix/plugin-kit";
 import { PiBodyHost, createPiBodyExtension } from "@micromatrix/pi-body";
 import { createMcpExtension, McpConnection, McpAuthStore, type McpExtensionController, type McpOptions } from "@micromatrix/plugin-mcp";
 import { createSkillsExtension, createSkillFile, loadedSkills, removeCreatedSkill, validateSkillSource, readSkillDocument, editSkillDocument, discoverSkillFiles, inspectSkillSources, previewSkillImport, planSkillImport } from "@micromatrix/plugin-skills";
@@ -36,6 +36,14 @@ import { createCapabilitiesPlugin, searchCapabilities as searchCapabilityEntries
 import { McpCatalogStore } from "./mcp-catalog.js";
 import { createMcpManagementPlugin } from "./mcp-management.js";
 import { builtinComputerUseConfiguration, computerUseConnection } from "./builtin-computer-use.js";
+import { prepareProjectData } from "./project-data.js";
+import { createProjectMemoryPlugin } from "./project-memory.js";
+
+function projectMemoryKey(workspace: string): string {
+  let canonical = resolve(workspace);
+  try { canonical = realpathSync(canonical); } catch { /* The saved workspace can be unavailable while stopped. */ }
+  return createHash("sha256").update(canonical).digest("hex");
+}
 
 export class RuntimeSupervisor implements RuntimeControl {
   readonly #cloudflared: CloudflaredUpdater;
@@ -192,6 +200,7 @@ export class RuntimeSupervisor implements RuntimeControl {
       enableShell: this.#config.plugins.shell,
       oauthEnabled: Boolean(this.#config.oauthPassword),
       rememberSecrets: this.#config.rememberSecrets,
+      projectMemoryEnabled: this.#projectMemoryEnabled(),
       permissionMode: this.#config.permissionMode,
       pluginIds: ["workspace", "shell"],
       extensions: parseExtensions(this.#config.extensions),
@@ -266,6 +275,11 @@ export class RuntimeSupervisor implements RuntimeControl {
         const workspace = await stat(this.#config.workspace).catch(() => undefined);
         if (!workspace?.isDirectory()) throw new Error(`Workspace is not a directory: ${this.#config.workspace}`);
         this.#assertSecuredExposure();
+        startupStage = "准备项目数据目录";
+        startup.signal.throwIfAborted();
+        const projectData = await prepareProjectData(this.#config.workspace);
+        startup.signal.throwIfAborted();
+        startupStage = "隧道程序检查";
         if (this.#config.network.provider === "cloudflare") {
           await this.#cloudflared.refresh();
           this.#provider = undefined;
@@ -273,7 +287,6 @@ export class RuntimeSupervisor implements RuntimeControl {
         const preview = this.#service ?? this.#createService(this.#config, this.#registry);
         const provider = this.#provider ?? this.#createProvider(this.#config, preview);
         this.#provider = provider;
-        startupStage = "隧道程序检查";
         await provider.preflight?.();
         startup.signal.throwIfAborted();
         const context = { workspace: this.#config.workspace, logger: this.#logger };
@@ -284,8 +297,10 @@ export class RuntimeSupervisor implements RuntimeControl {
         if (builtin.enabled) await this.#checkComputerUsePermissions(false); // Never prompt on Start.
         startup.signal.throwIfAborted();
         const connections = [...extensions.mcp, ...(builtin.enabled ? [computerUseConnection(this.#config.workspace, true, builtin.allowActions, this.#config.computerUse)] : [])];
-        const plugins = [createWorkspacePlugin(), createCapabilitiesPlugin(()=>this.#capabilityCatalog()), this.#managementPlugin(), ...(this.#config.plugins.shell ? [createShellPlugin()] : [])];
-        this.#host = await PiBodyHost.create(context, join(dirname(this.#config.configFile), "pi"), [
+        const plugins = [createWorkspacePlugin(), createCapabilitiesPlugin(()=>this.#capabilityCatalog()), this.#managementPlugin(),
+          ...(this.#projectMemoryEnabled() ? [createProjectMemoryPlugin(projectData.root)] : []),
+          ...(this.#config.plugins.shell ? [createShellPlugin()] : [])];
+        this.#host = await PiBodyHost.create(context, projectData.pi, [
           ...plugins.map((plugin) => ({ name: plugin.id, factory: createPiBodyExtension([plugin], context) })),
           ...connections.filter((connection) => connection.enabled).map((connection) => ({
             name: `mcp:${connection.id}`, factory: createMcpExtension(connection, this.#mcpOptions(connection), names => {
@@ -346,6 +361,7 @@ export class RuntimeSupervisor implements RuntimeControl {
         starting = false;
         this.#logger.log("info", "Pi body ready", {
           workspace: this.#config.workspace,
+          projectDataDirectory: projectData.root,
           mcpUrl: this.#network.publicMcpUrl,
           network: this.#network.modeLabel,
           oauth: Boolean(this.#config.oauthPassword),
@@ -502,6 +518,26 @@ export class RuntimeSupervisor implements RuntimeControl {
       if (this.#running) throw new Error("Stop the runtime before changing plugins");
       if (this.#failureCleanup) await this.#failureCleanup;
       await this.#commitConfiguration({ ...this.#config, plugins: { ...this.#config.plugins, shell: enabled } });
+    });
+  }
+
+  #projectMemoryEnabled(): boolean {
+    const disabled = this.#config.disabledProjectMemory;
+    return !disabled?.length || !disabled.includes(projectMemoryKey(this.#config.workspace));
+  }
+
+  async setProjectMemoryEnabled(workspace: string, enabled: boolean): Promise<void> {
+    return this.#exclusive(async () => {
+      this.#assertExtensionsEditable();
+      if (this.#failureCleanup) await this.#failureCleanup;
+      if (workspace !== this.#config.workspace) throw new Error("The active project changed; reload its memory setting");
+      const disabled = new Set(this.#config.disabledProjectMemory);
+      const key = projectMemoryKey(workspace);
+      if (enabled) disabled.delete(key);
+      else disabled.add(key);
+      const candidate = { ...this.#config, disabledProjectMemory: [...disabled] };
+      saveConfig(candidate, candidate.rememberSecrets);
+      this.#config = candidate;
     });
   }
 
@@ -821,7 +857,17 @@ export class RuntimeSupervisor implements RuntimeControl {
       authorization,
       registry,
       logger: this.#logger,
-      executionGate: this.approval,
+      executionGate: {
+        authorize: async (name, args, context, signal) => {
+          if (registry.ownerOf(name) === PROJECT_MEMORY.owner && (name === PROJECT_MEMORY.search || name === PROJECT_MEMORY.save)) {
+            signal?.throwIfAborted();
+            if (!context || context.authentication === "anonymous") throw new Error("Project memory requires an authenticated MCP session");
+            if (!this.#running || this.#stopping) throw new Error("Project memory is unavailable while Runtime is stopped");
+            return;
+          }
+          await this.approval.authorize(name, args, context, signal);
+        },
+      },
       serverInfo: { name: "Faber", version: APP_VERSION },
     });
   }

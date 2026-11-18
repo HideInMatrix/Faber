@@ -17,6 +17,7 @@ export interface DaemonConfig {
   readonly authToken: string | undefined;
   readonly oauthPassword: string | undefined;
   readonly rememberSecrets: boolean;
+  readonly disabledProjectMemory?: readonly string[];
   readonly permissionMode: ApprovalMode;
   readonly plugins: { readonly shell: boolean };
   readonly extensions?: ExtensionConfiguration;
@@ -38,6 +39,7 @@ interface SavedConfig {
   readonly port?: number;
   readonly oauthPassword?: string;
   readonly rememberSecrets?: boolean;
+  readonly disabledProjectMemory?: readonly string[];
   readonly permissionMode?: ApprovalMode;
   readonly plugins?: { readonly shell?: boolean };
   readonly extensions?: ExtensionConfiguration;
@@ -113,6 +115,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
     authToken: first(env, "MICROMATRIX_AUTH_TOKEN"),
     oauthPassword: first(env, "MICROMATRIX_OAUTH_PASSWORD") ?? disk.oauthPassword,
     rememberSecrets: boolean(first(env, "MICROMATRIX_REMEMBER_SECRETS"), disk.rememberSecrets ?? true),
+    disabledProjectMemory: Array.isArray(disk.disabledProjectMemory)
+      ? disk.disabledProjectMemory.filter(key => typeof key === "string" && /^[a-f0-9]{64}$/.test(key)) : [],
     permissionMode,
     plugins: { shell: boolean(first(env, "MICROMATRIX_ENABLE_SHELL"), disk.plugins?.shell ?? false) },
     extensions: builtin.extensions,
@@ -138,6 +142,7 @@ export function saveConfig(config: DaemonConfig, rememberSecrets: boolean): void
     port: config.port,
     ...(rememberSecrets && config.oauthPassword ? { oauthPassword: config.oauthPassword } : {}),
     rememberSecrets,
+    ...(config.disabledProjectMemory?.length ? { disabledProjectMemory: config.disabledProjectMemory } : {}),
     permissionMode: config.permissionMode,
     plugins: config.plugins,
     extensions: parseExtensions(config.extensions),

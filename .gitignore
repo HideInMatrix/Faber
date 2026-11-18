@@ -24,6 +24,7 @@ vitest.config.*
 .tmp/
 .local/
 /.micromatrix-workbench/
+/.faber/
 /.tmp-nvmd-ci/
 /.pnpm-store/
 apps/desktop/binaries/

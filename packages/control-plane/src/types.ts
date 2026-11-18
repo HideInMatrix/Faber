@@ -60,6 +60,7 @@ export interface RuntimeSnapshot {
   readonly enableShell: boolean;
   readonly oauthEnabled: boolean;
   readonly rememberSecrets: boolean;
+  readonly projectMemoryEnabled?: boolean;
   readonly permissionMode: "safe" | "trusted" | "dangerous";
   readonly networkOptions: Readonly<Record<string, string>>;
   readonly pluginIds: readonly string[];
@@ -120,6 +121,7 @@ export interface RuntimeControl {
   stop(): Promise<void>;
   configure(update: RuntimeConfigurationUpdate): Promise<void>;
   setPluginEnabled(pluginId: string, enabled: boolean): Promise<void>;
+  setProjectMemoryEnabled?(workspace: string, enabled: boolean): Promise<void>;
   configureExtensions?(value: ExtensionConfiguration): Promise<void>;
   createSkill?(id: string, description: string, instructions: string): Promise<void>;
   setMcpCredentials?(id: string, updates: unknown): Promise<void>;

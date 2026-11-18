@@ -107,6 +107,7 @@ export const desktopApi = {
   updateCloudflared: (version: string) => call<CloudflaredStatusDto>('update_cloudflared', version),
   runtime: (signal?: AbortSignal) => request<RuntimeDto>('get_runtime', [], signal),
   configureRuntime: (payload: RuntimeConfigurationDto) => call<RuntimeDto>('configure_runtime', payload),
+  setProjectMemory: (workspace: string, enabled: boolean) => call<RuntimeDto>('set_project_memory_enabled', workspace, enabled),
   startRuntime: (signal?: AbortSignal) => request<RuntimeDto>('start_runtime', [], signal),
   stopRuntime: () => call<RuntimeDto>('stop_runtime'),
   listBodyPlugins: () => call<BodyPluginDto[]>('list_body_plugins'),

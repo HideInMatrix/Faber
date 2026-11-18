@@ -39,9 +39,12 @@ const manager = useRuntimeManager()
       :copied-url="manager.copiedUrl.value"
       :runtime-url="manager.runtimeUrl.value"
       :network-providers="manager.networkProviders.value"
+      :project-memory-enabled="manager.runtime.value?.project_memory_enabled ?? true"
+      :project-memory-editable="manager.projectMemoryEditable.value"
       @choose-workspace="manager.chooseWorkspace"
       @copy-url="manager.copyUrl"
       @save="manager.saveRuntime"
+      @set-project-memory="manager.setProjectMemory"
       @toggle-running="manager.toggleRunning"
     />
   </section>

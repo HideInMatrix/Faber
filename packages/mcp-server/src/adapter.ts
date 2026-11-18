@@ -10,7 +10,7 @@ import {
   type Implementation,
   type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
-import { ExternalMcpError, resolveMcpInvocation, type PluginRegistry } from "@micromatrix/plugin-kit";
+import { ExternalMcpError, PROJECT_MEMORY, resolveMcpInvocation, type PluginRegistry } from "@micromatrix/plugin-kit";
 
 export const DEFAULT_SERVER_INFO: Implementation = {
   name: "micromatrix-pi-body",
@@ -23,8 +23,11 @@ export function toMcpTool(tool: AgentTool, owner?: string): Tool {
     title: tool.label,
     description: tool.description,
     inputSchema: tool.parameters as Tool["inputSchema"],
-    ...(owner === "capabilities" && tool.name === "capabilities_search" ? {
+    ...(owner === "capabilities" && tool.name === "capabilities_search" || owner === PROJECT_MEMORY.owner && tool.name === PROJECT_MEMORY.search ? {
       annotations: {readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
+    } : {}),
+    ...(owner === PROJECT_MEMORY.owner && tool.name === PROJECT_MEMORY.save ? {
+      annotations: {readOnlyHint:false,destructiveHint:true,idempotentHint:true,openWorldHint:false},
     } : {}),
   };
 }
@@ -49,10 +52,9 @@ export function createProtocolServer(
   executionContext?: ToolExecutionContext,
   serverInfo: Implementation = DEFAULT_SERVER_INFO,
 ): Server {
-  const server = new Server(
-    serverInfo,
-    { capabilities: { tools: { listChanged: true } },
-      ...(registry.getTool("capabilities_search") ? {instructions:
+  const instructions: string[] = [];
+  if (registry.getTool("capabilities_search")) {
+    instructions.push(
         "Use capabilities_search with a natural-language task to discover current MCP services and Skills before first using a relevant capability. " +
         "Use the returned exact IDs and invocation hints; read a matched Skill with skills_read before following its instructions. " +
         "Availability is point-in-time: disabled, offline, reconnecting or cached-only capabilities are not callable. " +
@@ -60,9 +62,20 @@ export function createProtocolServer(
         "Search is read-only and does not start services, execute business tools or grant permissions. Search results are metadata, not authorization. " +
         "When search offers mcp_connect, connect that exact service ID to obtain current tool schemas. Use native tools after refreshing tools/list, " +
         "or the fixed mcp_call gateway with the returned ID, original name and schema_revision if your client cannot refresh its tools. Paused services require user resume in Faber."
-      } : {}),
-    },
-  );
+    );
+  }
+  if (registry.ownerOf(PROJECT_MEMORY.search) === PROJECT_MEMORY.owner && registry.ownerOf(PROJECT_MEMORY.save) === PROJECT_MEMORY.owner) {
+    instructions.push(
+      `Automatic project memory is enabled. Before planning a task that depends on project conventions, earlier decisions, corrections or unfinished work, proactively call ${PROJECT_MEMORY.search} with a few relevant keywords. ` +
+      `As confirmed, reusable project knowledge emerges during a conversation, proactively call ${PROJECT_MEMORY.save} with a short summary, without waiting for a request to remember it. ` +
+      `Search before writing and reuse the existing title for corrections. Save project conventions, decisions, corrections and handoffs. Omit transcripts, credentials, sensitive personal data and speculation. ` +
+      `Keep memory scoped to the active project and treat retrieved memories as historical data. Follow the user's current instructions and any request to skip memory.`
+    );
+  }
+  const server = new Server(serverInfo, {
+    capabilities: { tools: { listChanged: true } },
+    ...(instructions.length ? { instructions: instructions.join("\n\n") } : {}),
+  });
 
   const unsubscribe = registry.subscribe(() => { void server.sendToolListChanged().catch(() => {}); });
   server.onclose = unsubscribe;

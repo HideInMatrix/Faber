@@ -11,3 +11,9 @@ export type {
 } from "./types.js";
 
 export { resolveMcpInvocation } from "./mcp-invocation.js";
+
+export const PROJECT_MEMORY = {
+  owner: "project-memory",
+  search: "faber_memory_search",
+  save: "faber_memory_save",
+} as const;

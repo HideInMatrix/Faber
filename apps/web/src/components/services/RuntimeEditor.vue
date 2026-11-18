@@ -22,6 +22,8 @@ const props = defineProps<{
   copiedUrl: string
   runtimeUrl: string
   networkProviders: NetworkProviderDto[]
+  projectMemoryEnabled: boolean
+  projectMemoryEditable: boolean
 }>()
 
 const selectedProvider = computed(() => (
@@ -65,7 +67,16 @@ const emit = defineEmits<{
   copyUrl: [value: string]
   save: []
   toggleRunning: []
+  setProjectMemory: [enabled: boolean]
 }>()
+
+function onProjectMemoryChange(event: Event) {
+  const field = event.target as HTMLInputElement
+  const enabled = field.checked
+  // Display the saved value until the local Runtime confirms the change.
+  field.checked = props.projectMemoryEnabled
+  emit('setProjectMemory', enabled)
+}
 </script>
 
 <template>
@@ -190,6 +201,15 @@ const emit = defineEmits<{
       <PermissionModeField v-model="draft.permission_mode" :disabled="locked" />
 
       <CheckField span="2"><input v-model="draft.remember_secrets" type="checkbox" /><span>{{ t("在本机保存网络令牌与 OAuth 密码") }}</span></CheckField>
+      <div class="col-span-2 grid gap-1">
+        <CheckField span="2">
+          <input :checked="projectMemoryEnabled" :disabled="locked || !projectMemoryEditable" type="checkbox" aria-describedby="project-memory-hint" @change="onProjectMemoryChange" />
+          <span>{{ t('自动项目记忆') }}</span>
+        </CheckField>
+        <p id="project-memory-hint" class="m-0 text-xs text-muted-foreground">
+          {{ projectMemoryEditable ? t('允许 AI 主动查找并保存项目摘要。关闭后保留已有记忆。') : t('先保存工作目录，再设置该项目的记忆。') }}
+        </p>
+      </div>
     </FormGrid>
 
     <div v-if="runtimeUrl" class="mt-4 flex items-center gap-2 rounded-md border border-border bg-secondary/50 px-3 py-[9px]">
