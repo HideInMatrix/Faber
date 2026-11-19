@@ -297,7 +297,10 @@ export class RuntimeSupervisor implements RuntimeControl {
         if (builtin.enabled) await this.#checkComputerUsePermissions(false); // Never prompt on Start.
         startup.signal.throwIfAborted();
         const connections = [...extensions.mcp, ...(builtin.enabled ? [computerUseConnection(this.#config.workspace, true, builtin.allowActions, this.#config.computerUse)] : [])];
-        const plugins = [createWorkspacePlugin(), createCapabilitiesPlugin(()=>this.#capabilityCatalog()), this.#managementPlugin(),
+        const plugins = [createWorkspacePlugin(), createCapabilitiesPlugin(() => this.#capabilityCatalog(), () =>
+          this.#running && !this.#stopping && this.#registry.ownerOf(PROJECT_MEMORY.search) === PROJECT_MEMORY.owner
+          && this.#registry.ownerOf(PROJECT_MEMORY.record) === PROJECT_MEMORY.owner
+          && this.#registry.ownerOf(PROJECT_MEMORY.save) === PROJECT_MEMORY.owner), this.#managementPlugin(),
           ...(this.#projectMemoryEnabled() ? [createProjectMemoryPlugin(projectData.root)] : []),
           ...(this.#config.plugins.shell ? [createShellPlugin()] : [])];
         this.#host = await PiBodyHost.create(context, projectData.pi, [
@@ -859,7 +862,8 @@ export class RuntimeSupervisor implements RuntimeControl {
       logger: this.#logger,
       executionGate: {
         authorize: async (name, args, context, signal) => {
-          if (registry.ownerOf(name) === PROJECT_MEMORY.owner && (name === PROJECT_MEMORY.search || name === PROJECT_MEMORY.save)) {
+          if (registry.ownerOf(name) === PROJECT_MEMORY.owner
+            && (name === PROJECT_MEMORY.search || name === PROJECT_MEMORY.record || name === PROJECT_MEMORY.save)) {
             signal?.throwIfAborted();
             if (!context || context.authentication === "anonymous") throw new Error("Project memory requires an authenticated MCP session");
             if (!this.#running || this.#stopping) throw new Error("Project memory is unavailable while Runtime is stopped");

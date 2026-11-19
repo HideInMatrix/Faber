@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
+import { PROJECT_MEMORY, PROJECT_MEMORY_INSTRUCTIONS } from "@micromatrix/plugin-kit";
 import type { BodyPlugin } from "@micromatrix/plugin-kit";
 
 export interface CapabilityTool {
@@ -134,14 +135,21 @@ export function searchCapabilities(entries: readonly CapabilityEntry[], value: u
     next_cursor:hasMore ? Buffer.from(JSON.stringify({revision,search,offset:end})).toString("base64url") : null,
     results:ranked.slice(offset,end).map(({entry,matched})=>publicEntry(entry,words,matched))};
 }
-export function createCapabilitiesPlugin(catalog: ()=>readonly CapabilityEntry[]): BodyPlugin {
+export function createCapabilitiesPlugin(catalog: ()=>readonly CapabilityEntry[], memoryAvailable: ()=>boolean = () => false): BodyPlugin {
   return {id:"capabilities",displayName:"Capability discovery",createTools:()=>[{
     name:"capabilities_search",label:"Search MCP and Skills",
     description:"Discover Faber capabilities using a natural-language task, e.g. '读取 Figma 设计稿并导出图片' or 'find a skill for Excel analysis'. Searches configured MCP services and loaded model-invocable Skills together by default. Empty query browses the catalog. Returns exact IDs, descriptions, current availability, catalog revision and precise next steps. Search never starts a service, runs a business tool, or grants permissions. Re-search when a tool becomes unavailable; cached/offline tools are not callable. When a result offers mcp_connect, connect that exact service ID first; user-paused or disabled services must be resumed/enabled in Faber. Read a matched Skill using the returned skills_read arguments before following it.",
     parameters:{type:"object",properties:{query:{type:"string",maxLength:512,description:"Natural-language task or keywords; omit or leave empty to browse. No ID required."},
       kind:{type:"string",enum:["all","mcp","skill"],default:"all",description:"Search both MCP and Skills by default."},limit:{type:"integer",minimum:1,maximum:25,default:10},
       cursor:{type:"string",maxLength:1024,description:"Use next_cursor to continue the same query; start over if the catalog revision changes."}},additionalProperties:false} as AgentTool["parameters"],
-    async execute(_id,params,signal){signal?.throwIfAborted();const result=searchCapabilities(catalog(),params);
-      return {content:[{type:"text",text:JSON.stringify(result)}],details:{capabilitiesSearch:result}};},
+    async execute(_id, params, signal) {
+      signal?.throwIfAborted();
+      const capabilities = searchCapabilities(catalog(), params);
+      const result = memoryAvailable() ? {
+        ...capabilities,
+        project_memory: { search_tool: PROJECT_MEMORY.search, record_tool: PROJECT_MEMORY.record, update_tool: PROJECT_MEMORY.save, instructions: PROJECT_MEMORY_INSTRUCTIONS },
+      } : capabilities;
+      return { content: [{ type: "text", text: JSON.stringify(result) }], details: { capabilitiesSearch: result } };
+    },
   }]};
 }

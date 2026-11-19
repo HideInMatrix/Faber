@@ -201,7 +201,7 @@ export class McpHttpService {
       ...(principal.clientName ? { clientName: principal.clientName } : {}),
     };
     const protocol = createProtocolServer(
-      this.#options.registry, this.#options.executionGate, executionContext, this.#options.serverInfo,
+      this.#options.registry, this.#options.executionGate, executionContext, this.#options.serverInfo, this.#options.logger,
     );
     this.#protocols.add(protocol);
     try {

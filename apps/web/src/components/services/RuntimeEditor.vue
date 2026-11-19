@@ -207,7 +207,7 @@ function onProjectMemoryChange(event: Event) {
           <span>{{ t('自动项目记忆') }}</span>
         </CheckField>
         <p id="project-memory-hint" class="m-0 text-xs text-muted-foreground">
-          {{ projectMemoryEditable ? t('允许 AI 主动查找并保存项目摘要。关闭后保留已有记忆。') : t('先保存工作目录，再设置该项目的记忆。') }}
+          {{ projectMemoryEditable ? t('网页 AI 调用保存工具后才会写入项目记忆。结果可在运行日志中查看。关闭后保留已有记忆。') : t('先保存工作目录，再设置该项目的记忆。') }}
         </p>
       </div>
     </FormGrid>

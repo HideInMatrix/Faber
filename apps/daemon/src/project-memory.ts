@@ -105,14 +105,19 @@ class ProjectMemoryStore {
       .slice(0, limit).map(item => item.note);
   }
 
-  save(value: unknown): { status: "created" | "updated" | "unchanged"; note: Note } {
+  save(value: unknown, allowUpdate: boolean): { status: "created" | "updated" | "unchanged"; note: Note } {
     const input = noteInput(value);
     const notes = this.#read();
-    const titleIndex = notes.findIndex(note => normalize(note.title) === normalize(input.title));
-    const index = titleIndex >= 0 ? titleIndex : notes.findIndex(note => normalize(note.summary) === normalize(input.summary));
+    const title = normalize(input.title), summary = normalize(input.summary);
+    const titleIndex = notes.findIndex(note => normalize(note.title) === title);
+    const index = titleIndex >= 0 ? titleIndex : notes.findIndex(note => normalize(note.summary) === summary);
     const previous = notes[index];
-    if (previous && previous.kind === input.kind && normalize(previous.summary) === normalize(input.summary)) {
-      return { status: "unchanged", note: previous };
+    if (previous) {
+      const sameSummary = normalize(previous.summary) === summary;
+      if (!allowUpdate && !sameSummary) {
+        throw new Error(`A note with this title already exists. Use ${PROJECT_MEMORY.save} to correct it, or choose a distinct title.`);
+      }
+      if (sameSummary && (!allowUpdate || previous.kind === input.kind)) return { status: "unchanged", note: previous };
     }
     const note = { ...input, updated_at: new Date().toISOString() };
     if (previous) notes[index] = note;
@@ -132,6 +137,27 @@ class ProjectMemoryStore {
 }
 
 const result = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value) }], details: {} });
+
+function memoryWriteTool(store: ProjectMemoryStore, allowUpdate: boolean): AgentTool {
+  return {
+    name: allowUpdate ? PROJECT_MEMORY.save : PROJECT_MEMORY.record,
+    label: allowUpdate ? "Update project memory" : "Record project memory",
+    description: allowUpdate
+      ? "Correct a confirmed project memory using its exact existing title. Search project memory first. For new notes, use faber_memory_record. Omit credentials, transcripts and sensitive personal data."
+      : "Record a new, confirmed project decision, convention or handoff before you reply, even if the user did not ask you to remember it. This deduplicates existing content and never replaces a note. Omit credentials, transcripts, sensitive personal information and speculation. Report a save only after this tool succeeds.",
+    parameters: { type: "object", properties: {
+      kind: { type: "string", enum: [...KINDS] },
+      title: { type: "string", minLength: 1, maxLength: 100 },
+      summary: { type: "string", minLength: 1, maxLength: 500 },
+    }, required: ["kind", "title", "summary"], additionalProperties: false } as AgentTool["parameters"],
+    async execute(_id, params, signal) {
+      signal?.throwIfAborted();
+      const saved = store.save(params, allowUpdate);
+      return { ...result(saved), details: { projectMemoryWrite: saved.status } };
+    },
+  };
+}
+
 export function createProjectMemoryPlugin(directory: string): BodyPlugin {
   const store = new ProjectMemoryStore(directory);
   return {
@@ -150,19 +176,6 @@ export function createProjectMemoryPlugin(directory: string): BodyPlugin {
         const { query, limit } = fields(params);
         return result({ notes: store.search(query, limit) });
       },
-    }, {
-      name: PROJECT_MEMORY.save,
-      label: "Save project memory",
-      description: "Proactively save a brief, confirmed decision, convention, correction or handoff that will help in future chats. Search first to avoid duplicates. Use an existing title to update it. Keep credentials, raw transcripts, sensitive personal information and speculation out of project memory.",
-      parameters: { type: "object", properties: {
-        kind: { type: "string", enum: [...KINDS] },
-        title: { type: "string", minLength: 1, maxLength: 100 },
-        summary: { type: "string", minLength: 1, maxLength: 500 },
-      }, required: ["kind", "title", "summary"], additionalProperties: false } as AgentTool["parameters"],
-      async execute(_id, params, signal) {
-        signal?.throwIfAborted();
-        return result(store.save(params));
-      },
-    }],
+    }, memoryWriteTool(store, false), memoryWriteTool(store, true)],
   };
 }
