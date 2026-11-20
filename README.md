@@ -4,6 +4,8 @@
 
 Faber，取自拉丁文“工匠”。让 AI 不止于对话，而是完成实际工作。
 
+首次使用请看 [Faber 使用教程](docs/user-guide.zh-CN.md)，可按步骤连接 ChatGPT 或 Claude、配置电脑控制，以及添加 MCP 服务和 Skill。
+
 ## 用途
 
 让网页 AI 通过 MCP 调用本地工具：**网页 AI 负责思考，Pi Agent 负责本地执行。** 本软件不运行本地模型。
